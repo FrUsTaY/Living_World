@@ -6,6 +6,7 @@ from PySide6.QtCore import QTimer, Qt
 from living_world.engine.simulation import Simulation
 from living_world.population.generation import generate_initial_world
 from living_world.gui.tabs.population_tab import PopulationTab
+from living_world.gui.tabs.families_tab import FamiliesTab
 from living_world.gui.dialogs.npc_card import NPCCardDialog
 from living_world.gui.dialogs.load_world import LoadWorldDialog
 from living_world.database.repository import Database
@@ -25,11 +26,6 @@ class MainWindow(QMainWindow):
 
         self._init_ui()
 
-        # Таймер для UI обновления и тиков симуляции
-        # В идеале симуляция должна быть в отдельном потоке (QThread),
-        # но для Этапа 1 ради простоты и избежания race conditions
-        # мы совместим её с таймером UI. При 1000x это может немного подлагивать,
-        # но зато 100% надежно работает.
         self.timer = QTimer()
         self.timer.timeout.connect(self._on_tick)
 
@@ -37,7 +33,6 @@ class MainWindow(QMainWindow):
         self.ticks_per_update = 1
         self.timer.start(self.timer_interval)
 
-        # Устанавливаем актуальную скорость из ComboBox при запуске
         self.change_speed()
 
     def _init_ui(self):
@@ -45,7 +40,6 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(main_widget)
         main_layout = QVBoxLayout(main_widget)
 
-        # Верхняя панель
         top_layout = QHBoxLayout()
         self.lbl_time = QLabel("День 1 · 08:00")
         self.lbl_time.setStyleSheet("font-weight: bold; font-size: 16px;")
@@ -75,10 +69,8 @@ class MainWindow(QMainWindow):
 
         main_layout.addLayout(top_layout)
 
-        # Вкладки
         self.tabs = QTabWidget()
 
-        # Заглушка для карты
         self.map_tab = QWidget()
         self.map_layout = QVBoxLayout(self.map_tab)
         self.map_layout.addWidget(QLabel("Карта города (в разработке)"))
@@ -87,10 +79,11 @@ class MainWindow(QMainWindow):
 
         self.tabs.addTab(self.map_tab, "Мир")
         self.tabs.addTab(self.pop_tab, "Жители")
+        self.fam_tab = FamiliesTab(self.sim, self)
+        self.tabs.addTab(self.fam_tab, "Семьи")
 
         main_layout.addWidget(self.tabs, stretch=3)
 
-        # Журнал событий
         main_layout.addWidget(QLabel("Журнал событий:"))
         self.log_list = QListWidget()
         main_layout.addWidget(self.log_list, stretch=1)
@@ -105,7 +98,6 @@ class MainWindow(QMainWindow):
     def change_speed(self):
         speed_str = self.cb_speed.currentText()
         if speed_str == "1x":
-            # 1 игровой тик (1 минута) = 1 секунда реального времени
             self.timer_interval = 1000
             self.ticks_per_update = 1
         elif speed_str == "10x":
@@ -116,7 +108,7 @@ class MainWindow(QMainWindow):
             self.ticks_per_update = 1
         elif speed_str == "1000x":
             self.timer_interval = 10
-            self.ticks_per_update = 10 # За один UI тик проходит 10 игровых минут
+            self.ticks_per_update = 10
 
         self.timer.setInterval(self.timer_interval)
 
@@ -127,15 +119,15 @@ class MainWindow(QMainWindow):
 
             self.lbl_time.setText(self.sim.time.format_time())
 
-            if self.tabs.currentIndex() == 1: # Вкладка Жители
+            if self.tabs.currentIndex() == 1:
                 self.pop_tab.update_data()
+            elif self.tabs.currentIndex() == 2:
+                self.fam_tab.update_data()
 
             self.update_log()
 
     def update_log(self):
         self.log_list.clear()
-        # Отображаем только последние 200 событий в GUI, чтобы не перегружать интерфейс,
-        # хотя в памяти (и БД) хранится полная история мира.
         display_events = self.sim.events_log[-200:]
         for ev in display_events:
             self.log_list.addItem(f"[{ev['time']}] {ev['msg']}")
@@ -148,6 +140,7 @@ class MainWindow(QMainWindow):
     def new_world(self):
         self.sim = Simulation()
         self.pop_tab.simulation = self.sim
+        self.fam_tab.simulation = self.sim
         generate_initial_world(self.sim.city, self.sim, 25)
         self.pop_tab.update_data()
         self.update_log()
@@ -164,7 +157,10 @@ class MainWindow(QMainWindow):
                     self.sim.time.get_time_dict(),
                     self.sim.npcs,
                     self.sim.city.buildings,
-                    self.sim.full_history
+                    self.sim.full_history,
+                    getattr(self.sim, 'families', []),
+                    self.sim.relationship_manager.get_all_relationships(),
+                    self.sim.memory_manager.get_all_memories()
                 )
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
@@ -175,7 +171,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted and dialog.selected_file:
             db = Database(dialog.selected_file)
             try:
-                time_dict, b_dicts, npc_dicts, events = db.load_world()
+                time_dict, b_dicts, npc_dicts, events, families, relationships, memories = db.load_world()
                 if not time_dict:
                     QMessageBox.warning(self, "Загрузка", "В файле нет сохраненного мира.")
                     return
@@ -197,12 +193,27 @@ class MainWindow(QMainWindow):
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = npc.state
+                    npc.traits = {
+                        'sociability': nd['trait_sociability'],
+                        'friendliness': nd['trait_friendliness'],
+                        'conflict': nd['trait_conflict'],
+                        'empathy': nd['trait_empathy'],
+                        'boldness': nd['trait_boldness'],
+                        'patience': nd['trait_patience']
+                    }
+                    npc.family_id = nd['family_id']
                     self.sim.add_npc(npc)
 
-                # Загружаем только последние 200 событий в GUI
                 self.sim.events_log = events[-200:] if len(events) > 200 else events
                 self.sim.full_history = events
+
+                # Загружаем социальные данные
+                self.sim.relationship_manager.load_relationships(relationships)
+                self.sim.memory_manager.load_memories(memories)
+                self.sim.families = families
+
                 self.pop_tab.simulation = self.sim
+                self.fam_tab.simulation = self.sim
 
                 self.lbl_time.setText(self.sim.time.format_time())
                 self.pop_tab.update_data()

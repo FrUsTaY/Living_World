@@ -2,6 +2,10 @@ import time
 from living_world.engine.time_manager import TimeManager
 from living_world.engine.event_bus import bus
 from living_world.city.city import City
+from living_world.engine.social.memory_manager import MemoryManager
+from living_world.engine.social.relationship_manager import RelationshipManager
+from living_world.engine.social.social_manager import SocialManager
+from living_world.engine.social.family_manager import FamilyManager
 
 class Simulation:
     def __init__(self):
@@ -12,6 +16,12 @@ class Simulation:
         # Чтобы при сохранении в новый файл не терялась старая история,
         # нам нужно хранить ВСЮ историю в RAM (но GUI отобразит лишь срез)
         self.full_history = []
+
+        self.memory_manager = MemoryManager(self)
+        self.relationship_manager = RelationshipManager(self)
+        self.social_manager = SocialManager(self)
+        self.family_manager = FamilyManager(self)
+        self.families = []
 
         bus.subscribe("log_event", self._on_log_event)
 
@@ -49,3 +59,4 @@ class Simulation:
             time_dict = self.time.get_time_dict()
             for npc in self.npcs:
                 npc.update(time_dict)
+            self.social_manager.process_social_ticks()

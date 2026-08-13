@@ -3,7 +3,7 @@ import random
 from living_world.engine.event_bus import bus
 
 class NPC:
-    def __init__(self, first_name, last_name, age, gender, profession, home_id, work_id, npc_id=None):
+    def __init__(self, first_name, last_name, age, gender, profession, home_id, work_id, npc_id=None, traits=None, family_id=None):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -24,7 +24,20 @@ class NPC:
         self.current_location = home_id
         self.state = "Спит"
 
+        self.traits = traits or self._generate_traits()
+        self.family_id = family_id
+
         self._last_state = self.state
+
+    def _generate_traits(self):
+        return {
+            'sociability': random.uniform(-1.0, 1.0),
+            'friendliness': random.uniform(-1.0, 1.0),
+            'conflict': random.uniform(-1.0, 1.0),
+            'empathy': random.uniform(-1.0, 1.0),
+            'boldness': random.uniform(-1.0, 1.0),
+            'patience': random.uniform(-1.0, 1.0)
+        }
 
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}"
