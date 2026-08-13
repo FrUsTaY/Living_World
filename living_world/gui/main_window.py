@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QMainWindow, QDialog, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QLabel, QTabWidget, QListWidget, QMessageBox,
                                QToolBar, QComboBox)
 from PySide6.QtCore import QTimer, Qt
