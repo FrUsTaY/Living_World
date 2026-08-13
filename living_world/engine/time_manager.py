@@ -31,3 +31,6 @@ class TimeManager:
             self.day += 1
 
         return True
+
+    def get_total_minutes(self):
+        return (self.day - 1) * 24 * 60 + self.hour * 60 + self.minute

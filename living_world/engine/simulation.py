@@ -17,8 +17,8 @@ class Simulation:
         # нам нужно хранить ВСЮ историю в RAM (но GUI отобразит лишь срез)
         self.full_history = []
 
-        self.memory_manager = MemoryManager()
-        self.relationship_manager = RelationshipManager()
+        self.memory_manager = MemoryManager(self)
+        self.relationship_manager = RelationshipManager(self)
         self.social_manager = SocialManager(self)
         self.family_manager = FamilyManager(self)
         self.families = []

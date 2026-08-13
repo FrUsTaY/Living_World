@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS relationships (
     trust REAL,
     respect REAL,
     romantic_interest REAL,
-    tension REAL
+    tension REAL,
+    last_interaction_time INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS memories (
@@ -67,7 +68,8 @@ CREATE TABLE IF NOT EXISTS memories (
     description TEXT,
     timestamp TEXT,
     sim_time TEXT,
-    significance REAL
+    significance REAL,
+    valence REAL DEFAULT 0.0
 );
 
 CREATE TABLE IF NOT EXISTS families (
@@ -98,6 +100,16 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN trait_boldness REAL DEFAULT 0.0")
                 cursor.execute("ALTER TABLE npcs ADD COLUMN trait_patience REAL DEFAULT 0.0")
                 cursor.execute("ALTER TABLE npcs ADD COLUMN family_id TEXT DEFAULT NULL")
+
+            cursor.execute("PRAGMA table_info(relationships)")
+            columns_rel = [info[1] for info in cursor.fetchall()]
+            if 'last_interaction_time' not in columns_rel:
+                cursor.execute("ALTER TABLE relationships ADD COLUMN last_interaction_time INTEGER DEFAULT 0")
+
+            cursor.execute("PRAGMA table_info(memories)")
+            columns_mem = [info[1] for info in cursor.fetchall()]
+            if 'valence' not in columns_mem:
+                cursor.execute("ALTER TABLE memories ADD COLUMN valence REAL DEFAULT 0.0")
 
     def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None):
         if memories is None: memories = []
@@ -150,10 +162,10 @@ class Database:
             for r in relationships:
                 cursor.execute(
                     """INSERT INTO relationships
-                    (source_npc_id, target_npc_id, familiarity, affinity, trust, respect, romantic_interest, tension)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (source_npc_id, target_npc_id, familiarity, affinity, trust, respect, romantic_interest, tension, last_interaction_time)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (r['source_npc_id'], r['target_npc_id'], r['familiarity'], r['affinity'],
-                     r['trust'], r['respect'], r['romantic_interest'], r['tension'])
+                     r['trust'], r['respect'], r['romantic_interest'], r['tension'], r.get('last_interaction_time', 0))
                 )
 
 
@@ -161,8 +173,8 @@ class Database:
             cursor.execute("DELETE FROM memories")
             for m in memories:
                 cursor.execute(
-                    "INSERT INTO memories (owner_npc_id, target_npc_id, event_type, description, timestamp, sim_time, significance) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                    (m['owner_npc_id'], m.get('target_npc_id'), m['event_type'], m['description'], m['timestamp'], m['sim_time'], m['significance'])
+                    "INSERT INTO memories (owner_npc_id, target_npc_id, event_type, description, timestamp, sim_time, significance, valence) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (m['owner_npc_id'], m.get('target_npc_id'), m['event_type'], m['description'], m['timestamp'], m['sim_time'], m['significance'], m.get('valence', 0.0))
                 )
 
             # Сохраняем только новые (несохраненные) события
