@@ -1,32 +1,32 @@
 @echo off
 setlocal
 
-echo [Living World] Проверка виртуального окружения...
+echo [Living World] Checking virtual environment...
 
-:: Проверяем, существует ли папка venv
+:: Check if venv folder exists
 if not exist "venv\Scripts\activate.bat" (
-    echo [Living World] Виртуальное окружение не найдено. Создаем venv...
+    echo [Living World] Virtual environment not found. Creating venv...
     python -m venv venv
     if errorlevel 1 (
-        echo [Ошибка] Не удалось создать виртуальное окружение. Проверьте, установлен ли Python.
+        echo [Error] Failed to create virtual environment. Check if Python is installed.
         pause
         exit /b 1
     )
 )
 
-:: Активируем виртуальное окружение
-echo [Living World] Активация виртуального окружения...
+:: Activate virtual environment
+echo [Living World] Activating virtual environment...
 call venv\Scripts\activate.bat
 
-:: Устанавливаем или проверяем зависимости
-echo [Living World] Проверка зависимостей...
+:: Install or check dependencies
+echo [Living World] Checking dependencies...
 python -m pip install --upgrade pip > nul
 pip install -r requirements.txt
 
-:: Запуск приложения
-echo [Living World] Запуск симуляции...
+:: Launch the application
+echo [Living World] Launching simulation...
 python main.py
 
 echo.
-echo [Living World] Приложение завершило работу.
+echo [Living World] Application exited.
 pause
