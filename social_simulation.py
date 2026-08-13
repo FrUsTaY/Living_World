@@ -38,15 +38,17 @@ class SocialMonitor:
         # Let's ignore basic state changes for the social diagnostic report to keep it clean.
         pass
 
+
     def run(self):
         print(f"Starting simulation for {self.total_days} days...")
         total_minutes = self.total_days * 24 * 60
 
-        # Determine reporting interval based on total days to avoid spam
         report_interval_days = max(1, self.total_days // 10)
         report_interval_mins = report_interval_days * 24 * 60
 
         next_report = report_interval_mins
+
+        self.report_log = []
 
         for i in range(total_minutes):
             self.sim.update()
@@ -56,20 +58,51 @@ class SocialMonitor:
                 next_report += report_interval_mins
 
         self.print_final_report()
+        self.ask_save()
 
     def print_stats(self):
-        print(f"\n--- INTERIM REPORT: {self._format_time()} ---")
+        header = f"--- INTERIM REPORT: {self._format_time()} ---"
+        print(f"\n{header}")
+        self.report_log.append(header)
         self._calculate_and_print_metrics()
-        print("------------------------------------\n")
+        footer = "------------------------------------"
+        print(f"{footer}\n")
+        self.report_log.append(footer)
+        self.report_log.append("")
 
     def print_final_report(self):
-        print("\n====================================")
-        print("====== FINAL DIAGNOSTIC REPORT =====")
-        print("====================================")
-        print(f"Time Elapsed: {self._format_time()}")
+        header1 = "===================================="
+        header2 = "====== FINAL DIAGNOSTIC REPORT ====="
+        header3 = "===================================="
+        time_elapsed = f"Time Elapsed: {self._format_time()}"
+
+        print(f"\n{header1}\n{header2}\n{header3}\n{time_elapsed}")
+
+        self.report_log.append(header1)
+        self.report_log.append(header2)
+        self.report_log.append(header3)
+        self.report_log.append(time_elapsed)
+
         self._calculate_and_print_metrics()
 
+    def ask_save(self):
+        while True:
+            choice = input("Сохранить диагностический отчет в .md файл? (y/n): ").strip().lower()
+            if choice == 'y':
+                filename = f"social_report_{self.total_days}days.md"
+                try:
+                    with open(filename, 'w', encoding='utf-8') as f:
+                        for line in self.report_log:
+                            f.write(line + "\n")
+                    print(f"Отчет сохранен в файл {filename}")
+                except Exception as e:
+                    print(f"Ошибка при сохранении: {e}")
+                break
+            elif choice == 'n':
+                break
+
     def _calculate_and_print_metrics(self):
+
         npcs = self.sim.npcs
         total_npcs = len(npcs)
 
@@ -142,19 +175,27 @@ class SocialMonitor:
         # Single NPCs
         singles = sum(1 for n in npcs if n.family_id is None)
 
-        print(f"Total NPCs:                     {total_npcs}")
-        print(f"Isolated NPCs (0 familiars):    {isolated_npcs}")
-        print(f"Average familiars per NPC:      {avg_fam:.1f}")
-        print(f"Max familiars for one NPC:      {max_fam}")
-        print(f"Total Unique Known Pairs:       {len(processed_pairs)}")
-        print(f"Friendships (Affinity > 40):    {friends}")
-        print(f"Enmities (Affinity < -40):      {enemies}")
-        print(f"Active Conflicts (Tension >50): {conflicts}")
-        print(f"One-way Romance (Romance > 40): {one_way_romance}")
-        print(f"Mutual Romance (Romance > 40):  {mutual_romance}")
-        print(f"Families / Marriages:           {families}")
-        print(f"Unmarried (Single) NPCs:        {singles}")
-        print(f"Total Memories Created:         {total_memories}")
+
+        metrics = [
+            f"- Total NPCs:                     {total_npcs}",
+            f"- Isolated NPCs (0 familiars):    {isolated_npcs}",
+            f"- Average familiars per NPC:      {avg_fam:.1f}",
+            f"- Max familiars for one NPC:      {max_fam}",
+            f"- Total Unique Known Pairs:       {len(processed_pairs)}",
+            f"- Friendships (Affinity > 40):    {friends}",
+            f"- Enmities (Affinity < -40):      {enemies}",
+            f"- Active Conflicts (Tension >50): {conflicts}",
+            f"- One-way Romance (Romance > 40): {one_way_romance}",
+            f"- Mutual Romance (Romance > 40):  {mutual_romance}",
+            f"- Families / Marriages:           {families}",
+            f"- Unmarried (Single) NPCs:        {singles}",
+            f"- Total Memories Created:         {total_memories}"
+        ]
+
+        for m in metrics:
+            print(m)
+            self.report_log.append(m)
+
 
 def main():
     parser = argparse.ArgumentParser(description="Living World - Social Simulation Diagnostic Tool")
