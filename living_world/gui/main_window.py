@@ -142,7 +142,7 @@ class MainWindow(QMainWindow):
         self.log_list.scrollToBottom()
 
     def show_npc_card(self, npc):
-        dialog = NPCCardDialog(npc, self)
+        dialog = NPCCardDialog(npc, self.sim.city, self)
         dialog.exec()
 
     def new_world(self):
@@ -164,9 +164,8 @@ class MainWindow(QMainWindow):
                     self.sim.time.get_time_dict(),
                     self.sim.npcs,
                     self.sim.city.buildings,
-                    self.sim.unsaved_events
+                    self.sim.full_history
                 )
-                self.sim.unsaved_events.clear()
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка сохранения: {e}")
@@ -202,7 +201,7 @@ class MainWindow(QMainWindow):
 
                 # Загружаем только последние 200 событий в GUI
                 self.sim.events_log = events[-200:] if len(events) > 200 else events
-                self.sim.unsaved_events = []
+                self.sim.full_history = events
                 self.pop_tab.simulation = self.sim
 
                 self.lbl_time.setText(self.sim.time.format_time())

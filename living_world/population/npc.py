@@ -83,8 +83,8 @@ class NPC:
         if self.current_location != location_id:
             self.current_location = location_id
 
-    def to_dict(self):
-        return {
+    def to_dict(self, city=None):
+        data = {
             "Имя": self.get_full_name(),
             "Возраст": self.age,
             "Профессия": self.profession,
@@ -94,3 +94,14 @@ class NPC:
             "Голод": f"{int(self.hunger)}%",
             "Состояние": self.state
         }
+
+        if city:
+            home = city.get_building(self.home_id)
+            work = city.get_building(self.work_id)
+            loc = city.get_building(self.current_location)
+
+            data["Дом"] = home.name if home else "Неизвестно"
+            data["Место работы"] = work.name if work else "Безработный"
+            data["Текущая локация"] = loc.name if loc else "На улице"
+
+        return data

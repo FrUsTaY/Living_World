@@ -19,3 +19,9 @@ class City:
 
     def get_workplaces(self):
         return [b for b in self.buildings if b.b_type == 'work']
+
+    def get_building(self, b_id):
+        for b in self.buildings:
+            if b.id == b_id:
+                return b
+        return None

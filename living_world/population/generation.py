@@ -20,6 +20,9 @@ def generate_initial_world(city, simulation, num_npcs=25):
     homes = city.get_homes()
     works = city.get_workplaces()
 
+    # Счетчик населения в каждом доме
+    home_occupants = {h.id: 0 for h in homes}
+
     for _ in range(num_npcs):
         gender = random.choice(["М", "Ж"])
         if gender == "М":
@@ -32,7 +35,19 @@ def generate_initial_world(city, simulation, num_npcs=25):
         age = random.randint(20, 50)
         profession = random.choice(PROFESSIONS)
 
-        home = random.choice(homes)
+        # Находим дом со свободными местами
+        available_homes = [h for h in homes if home_occupants[h.id] < h.capacity]
+        if not available_homes:
+            # Если не хватило мест (например, генерация большого кол-ва жителей), спавним новый дом
+            new_home = Building(f"Дом №{len(homes)+1}", "home", 4)
+            city.add_building(new_home)
+            homes.append(new_home)
+            home_occupants[new_home.id] = 0
+            available_homes = [new_home]
+
+        home = random.choice(available_homes)
+        home_occupants[home.id] += 1
+
         work = random.choice(works)
 
         npc = NPC(first_name, last_name, age, gender, profession, home.id, work.id)

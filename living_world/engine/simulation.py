@@ -9,14 +9,16 @@ class Simulation:
         self.city = City()
         self.npcs = []
         self.events_log = []
-        self.unsaved_events = []
+        # Чтобы при сохранении в новый файл не терялась старая история,
+        # нам нужно хранить ВСЮ историю в RAM (но GUI отобразит лишь срез)
+        self.full_history = []
 
         bus.subscribe("log_event", self._on_log_event)
 
     def _on_log_event(self, msg):
         event = {"time": self.time.format_time(), "msg": msg}
         self.events_log.append(event)
-        self.unsaved_events.append(event)
+        self.full_history.append(event)
         if len(self.events_log) > 200:
             self.events_log.pop(0)
 

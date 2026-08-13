@@ -2,9 +2,10 @@ from PySide6.QtWidgets import QDialog, QVBoxLayout, QLabel, QFormLayout
 from PySide6.QtCore import QTimer
 
 class NPCCardDialog(QDialog):
-    def __init__(self, npc, parent=None):
+    def __init__(self, npc, city=None, parent=None):
         super().__init__(parent)
         self.npc = npc
+        self.city = city
         self.setWindowTitle(f"Карточка жителя: {npc.get_full_name()}")
         self.setMinimumWidth(300)
 
@@ -12,7 +13,7 @@ class NPCCardDialog(QDialog):
         self.form = QFormLayout()
         self.labels = {}
 
-        data = npc.to_dict()
+        data = npc.to_dict(self.city)
         for key, value in data.items():
             val_label = QLabel(str(value))
             self.labels[key] = val_label
@@ -25,7 +26,7 @@ class NPCCardDialog(QDialog):
         self.update_timer.start(500) # Обновление каждые 500мс
 
     def update_data(self):
-        data = self.npc.to_dict()
+        data = self.npc.to_dict(self.city)
         for key, value in data.items():
             if key in self.labels:
                 self.labels[key].setText(str(value))
