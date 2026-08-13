@@ -1,0 +1,105 @@
+import sqlite3
+import os
+import json
+from datetime import datetime
+
+SCHEMA = """
+CREATE TABLE IF NOT EXISTS meta (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE TABLE IF NOT EXISTS npcs (
+    id TEXT PRIMARY KEY,
+    first_name TEXT,
+    last_name TEXT,
+    age INTEGER,
+    gender TEXT,
+    profession TEXT,
+    home_id TEXT,
+    work_id TEXT,
+    money REAL,
+    hunger REAL,
+    energy REAL,
+    mood REAL,
+    current_location TEXT,
+    state TEXT
+);
+
+CREATE TABLE IF NOT EXISTS buildings (
+    id TEXT PRIMARY KEY,
+    type TEXT,
+    name TEXT,
+    capacity INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT,
+    sim_time TEXT,
+    message TEXT
+);
+"""
+
+class Database:
+    def __init__(self, db_path="world.db"):
+        self.db_path = db_path
+        self._init_db()
+
+    def _init_db(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.executescript(SCHEMA)
+
+    def save_world(self, sim_time, npcs, buildings, events):
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+
+            # Сохраняем мету (время)
+            cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("sim_time", json.dumps(sim_time)))
+
+            # Сохраняем здания
+            cursor.execute("DELETE FROM buildings")
+            for b in buildings:
+                cursor.execute(
+                    "INSERT INTO buildings (id, type, name, capacity) VALUES (?, ?, ?, ?)",
+                    (b.id, b.b_type, b.name, b.capacity)
+                )
+
+            # Сохраняем NPC
+            cursor.execute("DELETE FROM npcs")
+            for npc in npcs:
+                cursor.execute(
+                    """INSERT INTO npcs
+                    (id, first_name, last_name, age, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (npc.id, npc.first_name, npc.last_name, npc.age, npc.gender, npc.profession,
+                     npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state)
+                )
+
+            # Сохраняем события (только новые, но для простоты сохраним последние N, либо дополним)
+            for event in events:
+                cursor.execute(
+                    "INSERT INTO events (timestamp, sim_time, message) VALUES (?, ?, ?)",
+                    (datetime.now().isoformat(), event['time'], event['msg'])
+                )
+
+    def load_world(self):
+        with sqlite3.connect(self.db_path) as conn:
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+
+            cursor.execute("SELECT value FROM meta WHERE key = 'sim_time'")
+            row = cursor.fetchone()
+            sim_time = json.loads(row['value']) if row else None
+
+            cursor.execute("SELECT * FROM buildings")
+            buildings = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT * FROM npcs")
+            npcs = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT * FROM events ORDER BY id DESC LIMIT 100")
+            events = [dict(r) for r in cursor.fetchall()]
+            events.reverse()
+
+            return sim_time, buildings, npcs, events
