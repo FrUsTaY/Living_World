@@ -46,40 +46,37 @@ class NPC:
 
         # 2. Логика поведения на основе времени суток и потребностей
 
-        # Сон
-        if hour >= 22 or hour < 7:
-            self._move_to(self.home_id)
-            self.state = "Спит"
-            self.energy += 0.2  # Восстановление энергии
-
-        # Работа (с 8 до 17)
-        elif 8 <= hour < 17:
-            # Сначала проверяем голод
-            if self.hunger < 30:
-                self.state = "Ест"
-                self.hunger += 2.0
-            else:
-                self._move_to(self.work_id)
-                self.state = "Работает"
-                self.energy -= 0.1 # На работе устает быстрее
-
-        # Свободное время (7-8 и 17-22)
+        # Проверка, нужно ли продолжать есть (гистерезис)
+        if self.state == "Ест" and self.hunger < 95:
+            self.hunger += 2.0
         else:
-            if self.hunger < 60:
-                self.state = "Ест"
-                self.hunger += 2.0
-            else:
+            # Сон
+            if hour >= 22 or hour < 7:
                 self._move_to(self.home_id)
-                self.state = "Отдыхает"
+                self.state = "Спит"
+                self.energy += 0.3  # Восстановление энергии во сне
 
-        # Проверка на изменение состояния для логирования (упрощенно)
+            # Работа (с 8 до 17)
+            elif 8 <= hour < 17:
+                if self.hunger < 30:
+                    self.state = "Ест"
+                else:
+                    self._move_to(self.work_id)
+                    self.state = "Работает"
+                    self.energy -= 0.1 # На работе устает быстрее
+
+            # Свободное время (7-8 и 17-22)
+            else:
+                if self.hunger < 60:
+                    self.state = "Ест"
+                else:
+                    self._move_to(self.home_id)
+                    self.state = "Отдыхает"
+
+        # Проверка на изменение состояния для логирования
         if self.state != self._last_state:
-            # Избегаем спама "Ест"
-            if self.state in ["Спит", "Работает", "Отдыхает"]:
-                # Логируем только если сменилась глобальная фаза
-                # Для Этапа 1 сделаем редкое логирование, чтобы не засорять консоль на 1000x
-                if random.random() < 0.1: # искусственное разреживание спама
-                    bus.publish("log_event", f"{self.get_full_name()} теперь {self.state.lower()}.")
+            state_text = self.state.lower()
+            bus.publish("log_event", f"{self.get_full_name()} теперь {state_text}.")
             self._last_state = self.state
 
     def _move_to(self, location_id):

@@ -134,7 +134,10 @@ class MainWindow(QMainWindow):
 
     def update_log(self):
         self.log_list.clear()
-        for ev in self.sim.events_log:
+        # Отображаем только последние 200 событий в GUI, чтобы не перегружать интерфейс,
+        # хотя в памяти (и БД) хранится полная история мира.
+        display_events = self.sim.events_log[-200:]
+        for ev in display_events:
             self.log_list.addItem(f"[{ev['time']}] {ev['msg']}")
         self.log_list.scrollToBottom()
 
@@ -161,8 +164,9 @@ class MainWindow(QMainWindow):
                     self.sim.time.get_time_dict(),
                     self.sim.npcs,
                     self.sim.city.buildings,
-                    self.sim.events_log
+                    self.sim.unsaved_events
                 )
+                self.sim.unsaved_events.clear()
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка сохранения: {e}")
@@ -196,7 +200,9 @@ class MainWindow(QMainWindow):
                     npc._last_state = npc.state
                     self.sim.add_npc(npc)
 
-                self.sim.events_log = events
+                # Загружаем только последние 200 событий в GUI
+                self.sim.events_log = events[-200:] if len(events) > 200 else events
+                self.sim.unsaved_events = []
                 self.pop_tab.simulation = self.sim
 
                 self.lbl_time.setText(self.sim.time.format_time())

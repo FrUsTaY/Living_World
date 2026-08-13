@@ -9,12 +9,14 @@ class Simulation:
         self.city = City()
         self.npcs = []
         self.events_log = []
+        self.unsaved_events = []
 
         bus.subscribe("log_event", self._on_log_event)
 
     def _on_log_event(self, msg):
         event = {"time": self.time.format_time(), "msg": msg}
         self.events_log.append(event)
+        self.unsaved_events.append(event)
         if len(self.events_log) > 200:
             self.events_log.pop(0)
 

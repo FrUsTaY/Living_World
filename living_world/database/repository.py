@@ -76,8 +76,7 @@ class Database:
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state)
                 )
 
-            # Сохраняем события (только новые, но для простоты сохраним последние N, либо дополним)
-            cursor.execute("DELETE FROM events")
+            # Сохраняем только новые (несохраненные) события
             for event in events:
                 cursor.execute(
                     "INSERT INTO events (timestamp, sim_time, message) VALUES (?, ?, ?)",
@@ -99,9 +98,8 @@ class Database:
             cursor.execute("SELECT * FROM npcs")
             npcs = [dict(r) for r in cursor.fetchall()]
 
-            cursor.execute("SELECT * FROM events ORDER BY id DESC LIMIT 100")
+            cursor.execute("SELECT * FROM events ORDER BY id ASC")
             events = [dict(r) for r in cursor.fetchall()]
             events = [{"time": e["sim_time"], "msg": e["message"]} for e in events]
-            events.reverse()
 
             return sim_time, buildings, npcs, events

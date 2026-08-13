@@ -42,4 +42,5 @@ def generate_initial_world(city, simulation, num_npcs=25):
 
         simulation.add_npc(npc)
 
-    simulation.events_log.append({"time": "День 1 · 08:00", "msg": f"Мир создан. Население: {num_npcs} человек."})
+    from living_world.engine.event_bus import bus
+    bus.publish("log_event", f"Мир создан. Население: {num_npcs} человек.")
