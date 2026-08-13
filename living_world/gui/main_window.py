@@ -7,7 +7,10 @@ from living_world.engine.simulation import Simulation
 from living_world.population.generation import generate_initial_world
 from living_world.gui.tabs.population_tab import PopulationTab
 from living_world.gui.dialogs.npc_card import NPCCardDialog
+from living_world.gui.dialogs.load_world import LoadWorldDialog
 from living_world.database.repository import Database
+from PySide6.QtWidgets import QInputDialog
+import os
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -16,7 +19,9 @@ class MainWindow(QMainWindow):
         self.resize(1000, 700)
 
         self.sim = Simulation()
-        self.db = Database("world.db")
+        self.saves_dir = "saves"
+        if not os.path.exists(self.saves_dir):
+            os.makedirs(self.saves_dir)
 
         self._init_ui()
 
@@ -28,9 +33,12 @@ class MainWindow(QMainWindow):
         self.timer = QTimer()
         self.timer.timeout.connect(self._on_tick)
 
-        self.timer_interval = 100  # 10 тиков в секунду (UI)
-        self.ticks_per_update = 1  # Сколько минут проходит за 1 тик
+        self.timer_interval = 1000
+        self.ticks_per_update = 1
         self.timer.start(self.timer_interval)
+
+        # Устанавливаем актуальную скорость из ComboBox при запуске
+        self.change_speed()
 
     def _init_ui(self):
         main_widget = QWidget()
@@ -144,50 +152,57 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Новый мир", "Мир успешно создан!")
 
     def save_world(self):
-        try:
-            self.db.save_world(
-                self.sim.time.get_time_dict(),
-                self.sim.npcs,
-                self.sim.city.buildings,
-                self.sim.events_log
-            )
-            QMessageBox.information(self, "Сохранение", "Мир сохранен в базу данных.")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка сохранения: {e}")
+        name, ok = QInputDialog.getText(self, "Сохранение мира", "Введите имя сохранения:")
+        if ok and name:
+            file_path = os.path.join(self.saves_dir, name + ".db")
+            db = Database(file_path)
+            try:
+                db.save_world(
+                    self.sim.time.get_time_dict(),
+                    self.sim.npcs,
+                    self.sim.city.buildings,
+                    self.sim.events_log
+                )
+                QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Ошибка сохранения: {e}")
 
     def load_world(self):
-        try:
-            time_dict, b_dicts, npc_dicts, events = self.db.load_world()
-            if not time_dict:
-                QMessageBox.warning(self, "Загрузка", "В базе нет сохраненного мира.")
-                return
+        dialog = LoadWorldDialog(self.saves_dir, self)
+        if dialog.exec() == QDialog.Accepted and dialog.selected_file:
+            db = Database(dialog.selected_file)
+            try:
+                time_dict, b_dicts, npc_dicts, events = db.load_world()
+                if not time_dict:
+                    QMessageBox.warning(self, "Загрузка", "В файле нет сохраненного мира.")
+                    return
 
-            self.sim = Simulation()
-            self.sim.time.set_time(time_dict['day'], time_dict['hour'], time_dict['minute'])
+                self.sim = Simulation()
+                self.sim.time.set_time(time_dict['day'], time_dict['hour'], time_dict['minute'])
 
-            from living_world.city.city import Building
-            for b in b_dicts:
-                self.sim.city.add_building(Building(b['name'], b['type'], b['capacity'], b['id']))
+                from living_world.city.city import Building
+                for b in b_dicts:
+                    self.sim.city.add_building(Building(b['name'], b['type'], b['capacity'], b['id']))
 
-            from living_world.population.npc import NPC
-            for nd in npc_dicts:
-                npc = NPC(nd['first_name'], nd['last_name'], nd['age'], nd['gender'], nd['profession'], nd['home_id'], nd['work_id'], nd['id'])
-                npc.money = nd['money']
-                npc.hunger = nd['hunger']
-                npc.energy = nd['energy']
-                npc.mood = nd['mood']
-                npc.current_location = nd['current_location']
-                npc.state = nd['state']
-                npc._last_state = npc.state
-                self.sim.add_npc(npc)
+                from living_world.population.npc import NPC
+                for nd in npc_dicts:
+                    npc = NPC(nd['first_name'], nd['last_name'], nd['age'], nd['gender'], nd['profession'], nd['home_id'], nd['work_id'], nd['id'])
+                    npc.money = nd['money']
+                    npc.hunger = nd['hunger']
+                    npc.energy = nd['energy']
+                    npc.mood = nd['mood']
+                    npc.current_location = nd['current_location']
+                    npc.state = nd['state']
+                    npc._last_state = npc.state
+                    self.sim.add_npc(npc)
 
-            self.sim.events_log = events
-            self.pop_tab.simulation = self.sim
+                self.sim.events_log = events
+                self.pop_tab.simulation = self.sim
 
-            self.lbl_time.setText(self.sim.time.format_time())
-            self.pop_tab.update_data()
-            self.update_log()
+                self.lbl_time.setText(self.sim.time.format_time())
+                self.pop_tab.update_data()
+                self.update_log()
 
-            QMessageBox.information(self, "Загрузка", "Мир успешно загружен!")
-        except Exception as e:
-            QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки: {e}")
+                QMessageBox.information(self, "Загрузка", "Мир успешно загружен!")
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Ошибка загрузки: {e}")
