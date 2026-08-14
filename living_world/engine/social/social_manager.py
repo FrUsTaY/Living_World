@@ -1,3 +1,4 @@
+import math
 from living_world.engine.event_bus import bus
 from living_world.engine.social.compatibility import CompatibilityManager
 import random
@@ -66,7 +67,20 @@ class SocialManager:
         appeal += rel['affinity'] * 0.15
         appeal += rel['romantic_interest'] * 0.2
         appeal += rel['tension'] * 0.15 * npc_a.traits.get('conflict', 0.0)
-        appeal += context_score * 10.0
+
+        # Recovery: memories boost appeal significantly for old friends
+        if context_score > 0 and rel['affinity'] < 20:
+            appeal += context_score * 20.0
+        else:
+            appeal += context_score * 10.0
+
+        # 3.0 Reciprocity Penalty
+        sent = rel.get('initiations_sent', 0)
+        recvd = rel.get('initiations_received', 0)
+        if sent > 3:
+            ratio = recvd / float(sent)
+            if ratio < 0.3:
+                appeal *= 0.5 # A wants to talk 50% less if B ignores them
 
         return max(1.0, appeal)
 
@@ -118,12 +132,16 @@ class SocialManager:
 
     def _resolve_action(self, action_name, npc_a, npc_b, time_dict):
         rel_mgr = self.simulation.relationship_manager
+
+        is_meaningful = action_name in ['deep_talk', 'flirt', 'argue', 'propose', 'divorce']
+
         if action_name == 'greeting':
             self._handle_greeting(npc_a, npc_b, time_dict)
             return
 
-        rel_mgr.touch_relationship(npc_a.id, npc_b.id, initiator=True)
-        rel_mgr.touch_relationship(npc_b.id, npc_a.id, initiator=False)
+        # 3.0 Meaningful vs Superficial
+        rel_mgr.touch_relationship(npc_a.id, npc_b.id, initiator=True, is_meaningful=is_meaningful)
+        rel_mgr.touch_relationship(npc_b.id, npc_a.id, initiator=False, is_meaningful=is_meaningful)
 
         comp = CompatibilityManager.calculate_compatibility(npc_a, npc_b)
         rel_a_b = rel_mgr.get_relationship(npc_a.id, npc_b.id)
@@ -131,9 +149,12 @@ class SocialManager:
         context_b_a = self.simulation.memory_manager.get_context_score(npc_b.id, npc_a.id)
         context_a_b = self.simulation.memory_manager.get_context_score(npc_a.id, npc_b.id)
 
-        # Helper for Diminishing Returns
-        def get_gain(base_gain, current_val):
-            return rel_mgr.get_diminishing_returns(base_gain, current_val)
+        # Helper for Diminishing Returns and 3.0 Interaction Saturation
+        def get_gain(base_gain, current_val, source_rel):
+            diminished = rel_mgr.get_diminishing_returns(base_gain, current_val)
+            interactions_today = source_rel.get('daily_interactions_count', 1) - 1
+            saturation = math.pow(0.7, max(0, interactions_today))
+            return diminished * saturation
 
         if action_name == 'chat':
             aff_factor_b = max(-15, rel_b_a['affinity']) * 0.1
@@ -145,7 +166,7 @@ class SocialManager:
             if success_b >= -5:
                 relief_b = 2.0 + (npc_b.traits.get('empathy', 0) * 2.0) + (success_b * 0.2) + (max(0, rel_b_a['trust']) * 0.05)
                 if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -max(1.0, relief_b))
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(0.8, rel_b_a['affinity']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(2.8, rel_b_a['affinity'], rel_b_a))
             else:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 1.0)
 
@@ -157,7 +178,7 @@ class SocialManager:
             if success_a >= -5:
                 relief_a = 2.0 + (npc_a.traits.get('empathy', 0) * 2.0) + (success_a * 0.2) + (max(0, rel_a_b['trust']) * 0.05)
                 if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -max(1.0, relief_a))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(0.8, rel_a_b['affinity']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(2.8, rel_a_b['affinity'], rel_a_b))
             else:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 1.0)
 
@@ -168,8 +189,8 @@ class SocialManager:
             if success_b > 0:
                 relief_b = 3.0 + (npc_b.traits.get('empathy', 0) * 2.0) + (success_b * 0.2) + (rel_b_a['trust'] * 0.1)
                 if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -max(1.0, relief_b))
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(2.5, rel_b_a['affinity']))
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', get_gain(1.5, rel_b_a['trust']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(5.5, rel_b_a['affinity'], rel_b_a))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', get_gain(3.5, rel_b_a['trust'], rel_b_a))
             else:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 2.0)
 
@@ -177,8 +198,8 @@ class SocialManager:
             if success_a > 0:
                 relief_a = 3.0 + (npc_a.traits.get('empathy', 0) * 2.0) + (success_a * 0.2) + (rel_a_b['trust'] * 0.1)
                 if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -max(1.0, relief_a))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(2.5, rel_a_b['affinity']))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', get_gain(1.5, rel_a_b['trust']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(5.5, rel_a_b['affinity'], rel_a_b))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', get_gain(3.5, rel_a_b['trust'], rel_a_b))
             else:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 2.0)
 
@@ -187,19 +208,19 @@ class SocialManager:
         elif action_name == 'argue':
             if rel_b_a['tension'] < 80:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 5.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -get_gain(2.0, rel_b_a['trust']))
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(4.0, rel_b_a['affinity']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -get_gain(2.0, rel_b_a['trust'], rel_b_a))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(4.0, rel_b_a['affinity'], rel_b_a))
             else:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -1.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(1.0, rel_b_a['affinity']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(1.0, rel_b_a['affinity'], rel_b_a))
 
             if rel_a_b['tension'] < 80:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 3.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -get_gain(1.0, rel_a_b['trust']))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(2.0, rel_a_b['affinity']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -get_gain(1.0, rel_a_b['trust'], rel_a_b))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(2.0, rel_a_b['affinity'], rel_a_b))
             else:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -1.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(0.5, rel_a_b['affinity']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(0.5, rel_a_b['affinity'], rel_a_b))
 
             if rel_b_a['tension'] > 40 or rel_a_b['tension'] > 40:
                 self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Ссора", f"Ссора с {npc_a.first_name}", 0.6, -0.6)
@@ -208,10 +229,10 @@ class SocialManager:
         elif action_name == 'flirt':
             success_b = (rel_b_a['romantic_interest'] * 0.5) + (rel_b_a['affinity'] * 0.2) + (comp * 10) - (rel_b_a['tension'] * 0.5) + (context_b_a * 5.0)
             if success_b > 5:
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'romantic_interest', get_gain(5.0, rel_b_a['romantic_interest']))
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(2.0, rel_b_a['affinity']))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', get_gain(5.0, rel_a_b['romantic_interest']))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(2.0, rel_a_b['affinity']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'romantic_interest', get_gain(5.0, rel_b_a['romantic_interest'], rel_b_a))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(2.0, rel_b_a['affinity'], rel_b_a))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', get_gain(5.0, rel_a_b['romantic_interest'], rel_a_b))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(2.0, rel_a_b['affinity'], rel_a_b))
 
                 if success_b > 20 and random.random() < 0.3:
                     self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Флирт", f"Удачный флирт с {npc_a.first_name}", 0.5, 0.7)
@@ -220,7 +241,7 @@ class SocialManager:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 3.0)
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -1.0)
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 5.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', -get_gain(5.0, rel_a_b['romantic_interest']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', -get_gain(5.0, rel_a_b['romantic_interest'], rel_a_b))
                 self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Отказ", f"{npc_b.first_name} отверг(ла) флирт", 0.7, -0.8)
 
         elif action_name == 'propose':

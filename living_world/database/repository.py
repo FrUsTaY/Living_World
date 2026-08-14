@@ -58,6 +58,8 @@ CREATE TABLE IF NOT EXISTS relationships (
     romantic_interest REAL,
     tension REAL,
     last_interaction_time INTEGER DEFAULT 0,
+    last_meaningful_interaction_time INTEGER DEFAULT 0,
+    daily_interactions_count INTEGER DEFAULT 0,
     initiations_sent INTEGER DEFAULT 0,
     initiations_received INTEGER DEFAULT 0
 );

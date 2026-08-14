@@ -19,6 +19,8 @@ class RelationshipManager:
                 'romantic_interest': 0.0,
                 'tension': 0.0,
                 'last_interaction_time': self.simulation.time.get_total_minutes(),
+                'last_meaningful_interaction_time': self.simulation.time.get_total_minutes(),
+                'daily_interactions_count': 0,
                 'initiations_sent': 0,
                 'initiations_received': 0
             }
@@ -28,13 +30,22 @@ class RelationshipManager:
 
     def _apply_lazy_decay(self, rel_dict, source_id):
         current_time = self.simulation.time.get_total_minutes()
-        last_time = rel_dict.get('last_interaction_time', current_time)
+        last_contact = rel_dict.get('last_interaction_time', current_time)
+        last_meaningful = rel_dict.get('last_meaningful_interaction_time', current_time)
 
-        days_passed = (current_time - last_time) / (24 * 60.0)
-        if days_passed <= 0:
-            return rel_dict.copy()
+        # Calculate daily saturation reset
+        days_since_contact = (current_time - last_contact) / (24 * 60.0)
 
         decayed_rel = rel_dict.copy()
+
+        if days_since_contact > 0.5: # Reset daily interactions if half a day passed
+            decayed_rel['daily_interactions_count'] = 0
+
+        days_passed_meaningful = (current_time - last_meaningful) / (24 * 60.0)
+
+        if days_passed_meaningful <= 0 and days_since_contact <= 0:
+            return decayed_rel
+
         target_id = rel_dict['target_npc_id']
 
         # Cache npcs dict for O(1) lookups if not exists
@@ -53,9 +64,10 @@ class RelationshipManager:
         # Calculate Social Mass gracefully (avoiding full scan if possible, but keeping it simple for now)
         # To avoid O(E) scan here, we can cache active mass per NPC per tick, or just count known relationships roughly
         # For Stage 2.5, counting dict keys for source_id is much faster than full value scan.
-        # It's an approximation of mass.
-        active_links = sum(1 for (s, t) in self.relationships.keys() if s == source_id)
-        load_penalty = max(0, (active_links * 50 - 2000) / 100000.0) # Assume avg mass 50 per link
+        # 3.0 Social Mass
+        # Only count links that actually exist meaningfully
+        active_links = sum(1 for (s, t), r in self.relationships.items() if s == source_id and (r['affinity'] > 30 or r['affinity'] < -30 or r['trust'] > 30 or r['romantic_interest'] > 30))
+        load_penalty = (active_links ** 1.8) / 40000.0
 
 
         # Calculate Reciprocity (reset monthly to track current dynamic)
@@ -74,8 +86,10 @@ class RelationshipManager:
         if sent > 5 and reciprocity < 0.3:
             recip_penalty = 0.005 # Mild penalty 0.5% per day
 
-        # TENSION DECAY
-        decayed_rel['tension'] *= math.pow(0.85, days_passed)
+        # TENSION DECAY (uses contact days, not meaningful)
+        decayed_rel['tension'] *= math.pow(0.85, max(0, days_since_contact))
+
+        days_passed = max(0, days_passed_meaningful)
 
         # ROMANTIC DECAY
         romance_decay_rate = 0.95
@@ -102,12 +116,18 @@ class RelationshipManager:
         aff_decay_rate = max(0.97, min(0.998, aff_decay_rate))
         decayed_rel['affinity'] *= math.pow(aff_decay_rate, days_passed)
 
-        # TRUST DECAY
+        # TRUST DECAY (also based on meaningful time)
         trust_decay_rate = 0.998 # Very stable
         if decayed_rel['affinity'] < 0:
             trust_decay_rate = 0.985 # Enemies lose trust
 
         decayed_rel['trust'] *= math.pow(trust_decay_rate, days_passed)
+
+        # Cleanup tails
+        if abs(decayed_rel['affinity']) < 2.0:
+            decayed_rel['affinity'] = 0.0
+        if abs(decayed_rel['tension']) < 2.0:
+            decayed_rel['tension'] = 0.0
 
         return decayed_rel
 
@@ -130,6 +150,14 @@ class RelationshipManager:
         rel_decayed = self.get_relationship(source_id, target_id)
 
         key = (source_id, target_id)
+
+        # When we save the decayed state back, we must bake it in by advancing the timestamps
+        # to the current time, so the next decay calculation starts from 0 days passed.
+        # Otherwise, we double-decay the same period on subsequent fetches.
+        current_time = self.simulation.time.get_total_minutes()
+        rel_decayed['last_interaction_time'] = current_time
+        rel_decayed['last_meaningful_interaction_time'] = current_time
+
         self.relationships[key] = rel_decayed
         rel = self.relationships[key]
 
@@ -145,11 +173,18 @@ class RelationshipManager:
 
         return rel[axis]
 
-    def touch_relationship(self, source_id, target_id, initiator=False):
+    def touch_relationship(self, source_id, target_id, initiator=False, is_meaningful=False):
         rel_decayed = self.get_relationship(source_id, target_id)
         key = (source_id, target_id)
         self.relationships[key] = rel_decayed
-        self.relationships[key]['last_interaction_time'] = self.simulation.time.get_total_minutes()
+
+        current_time = self.simulation.time.get_total_minutes()
+        self.relationships[key]['last_interaction_time'] = current_time
+
+        if is_meaningful:
+            self.relationships[key]['last_meaningful_interaction_time'] = current_time
+
+        self.relationships[key]['daily_interactions_count'] = self.relationships[key].get('daily_interactions_count', 0) + 1
 
         # To avoid KeyError from old db loads, check and initialize
         if 'initiations_sent' not in self.relationships[key]:
