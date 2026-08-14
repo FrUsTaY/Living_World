@@ -7,11 +7,26 @@ from living_world.population.generation import generate_initial_world
 from living_world.engine.event_bus import bus
 
 class SocialMonitor:
+
+
     def __init__(self, simulation, days, log_events=True):
         self.sim = simulation
         self.total_days = days
         self.log_events = log_events
         self.events_log = []
+
+        self.flow_friendships_created = 0
+        self.flow_friendships_lost = 0
+        self.flow_enmities_created = 0
+        self.flow_enmities_resolved = 0
+        self.flow_romances_started = 0
+        self.flow_romances_ended = 0
+
+        self.prev_friendships = set()
+        self.prev_enmities = set()
+        self.prev_romances = set()
+
+        self.prev_affinities = {}
 
         if self.log_events:
             bus.subscribe("memory_created", self._on_memory)
@@ -101,13 +116,10 @@ class SocialMonitor:
             elif choice == 'n':
                 break
 
-    def _calculate_and_print_metrics(self):
 
+    def _calculate_and_print_metrics(self):
         npcs = self.sim.npcs
         total_npcs = len(npcs)
-
-        # Get all relationships directly (raw) and apply lazy decay to measure current state
-        # We'll use get_all_relationships_for for each NPC to ensure we get decayed values
 
         friends = 0
         enemies = 0
@@ -117,84 +129,136 @@ class SocialMonitor:
 
         familiar_counts = {npc.id: 0 for npc in npcs}
         isolated_npcs = total_npcs
-
-        # To avoid double counting mutual relationships, keep track of pairs
         processed_pairs = set()
+
+        curr_friendships = set()
+        curr_enmities = set()
+        curr_romances = set()
 
         for npc in npcs:
             rels = self.sim.relationship_manager.get_all_relationships_for(npc.id)
             if len(rels) > 0:
                 has_familiar = any(r['familiarity'] > 0 for r in rels)
-                if has_familiar:
-                    isolated_npcs -= 1
+                if has_familiar: isolated_npcs -= 1
 
             for rel in rels:
                 if rel['familiarity'] == 0: continue
-
                 familiar_counts[npc.id] += 1
 
                 target_id = rel['target_npc_id']
                 pair_key = tuple(sorted([npc.id, target_id]))
 
-                # Romance logic
-                if rel['romantic_interest'] > 40:
-                    # Check mutual
-                    rev_rel = next((r for r in self.sim.relationship_manager.get_all_relationships_for(target_id) if r['target_npc_id'] == npc.id), None)
-                    if rev_rel and rev_rel['romantic_interest'] > 40:
+                rev_rel = next((r for r in self.sim.relationship_manager.get_all_relationships_for(target_id) if r['target_npc_id'] == npc.id), None)
+                aff_a = rel['affinity']
+                aff_b = rev_rel['affinity'] if rev_rel else 0
+                ten_a = rel['tension']
+                ten_b = rev_rel['tension'] if rev_rel else 0
+                rom_a = rel['romantic_interest']
+                rom_b = rev_rel['romantic_interest'] if rev_rel else 0
+
+                # Check transitions for logging
+                if self.log_events:
+                    key_a_b = (npc.id, target_id)
+                    prev_aff = self.prev_affinities.get(key_a_b, 0.0)
+                    if prev_aff < 40 and aff_a >= 40:
+                        target_name = next((n.first_name for n in npcs if n.id == target_id), "Unknown")
+                        print(f"\n{self._format_time()}: [TRANSITION] {npc.first_name} + {target_name}: Friendship Created (Affinity {prev_aff:.1f} -> {aff_a:.1f})")
+                    elif prev_aff >= 40 and aff_a < 40:
+                        target_name = next((n.first_name for n in npcs if n.id == target_id), "Unknown")
+                        print(f"\n{self._format_time()}: [TRANSITION] {npc.first_name} + {target_name}: Friendship Lost (Affinity {prev_aff:.1f} -> {aff_a:.1f})")
+                    self.prev_affinities[key_a_b] = aff_a
+
+
+                if rom_a > 40:
+                    if rev_rel and rom_b > 40:
                         if pair_key not in processed_pairs:
                             mutual_romance += 1
+                            curr_romances.add(pair_key)
                     else:
                         one_way_romance += 1
 
-                # Friendship / Enmity (only count unique pairs)
                 if pair_key not in processed_pairs:
-                    rev_rel = next((r for r in self.sim.relationship_manager.get_all_relationships_for(target_id) if r['target_npc_id'] == npc.id), None)
-
-                    aff_a = rel['affinity']
-                    aff_b = rev_rel['affinity'] if rev_rel else 0
-                    ten_a = rel['tension']
-                    ten_b = rev_rel['tension'] if rev_rel else 0
-
                     if aff_a > 40 and aff_b > 40:
                         friends += 1
+                        curr_friendships.add(pair_key)
                     elif aff_a < -40 or aff_b < -40:
                         enemies += 1
+                        curr_enmities.add(pair_key)
 
                     if ten_a > 50 or ten_b > 50:
                         conflicts += 1
 
                     processed_pairs.add(pair_key)
 
+        # Calculate Flow Deltas
+        new_friends = curr_friendships - self.prev_friendships
+        lost_friends = self.prev_friendships - curr_friendships
+        self.flow_friendships_created += len(new_friends)
+        self.flow_friendships_lost += len(lost_friends)
+
+        new_enmities = curr_enmities - self.prev_enmities
+        resolved_enmities = self.prev_enmities - curr_enmities
+        self.flow_enmities_created += len(new_enmities)
+        self.flow_enmities_resolved += len(resolved_enmities)
+
+        new_romances = curr_romances - self.prev_romances
+        ended_romances = self.prev_romances - curr_romances
+        self.flow_romances_started += len(new_romances)
+        self.flow_romances_ended += len(ended_romances)
+
+        # Warnings
+        warning_msg = ""
+        # Check monotonic growth (just a simple check if it only grows and never loses and is > 10)
+        if len(new_friends) > 0 and len(lost_friends) == 0 and len(curr_friendships) > 10:
+            self.consecutive_friend_growth = getattr(self, 'consecutive_friend_growth', 0) + 1
+        elif len(lost_friends) > 0:
+            self.consecutive_friend_growth = 0
+
+        if getattr(self, 'consecutive_friend_growth', 0) >= 3:
+            warning_msg = "! WARNING: MONOTONIC GROWTH DETECTED (Friendships only grew for 3+ snapshots, no turnover)."
+
+
+        self.prev_friendships = curr_friendships
+        self.prev_enmities = curr_enmities
+        self.prev_romances = curr_romances
+
         total_memories = len(self.sim.memory_manager.get_all_memories())
         families = len(getattr(self.sim, 'families', []))
 
         counts = list(familiar_counts.values())
         avg_fam = sum(counts) / total_npcs if total_npcs > 0 else 0
-        max_fam = max(counts) if counts else 0
-
-        # Single NPCs
-        singles = sum(1 for n in npcs if n.family_id is None)
-
 
         metrics = [
-            f"- Total NPCs:                     {total_npcs}",
-            f"- Isolated NPCs (0 familiars):    {isolated_npcs}",
-            f"- Average familiars per NPC:      {avg_fam:.1f}",
-            f"- Max familiars for one NPC:      {max_fam}",
-            f"- Total Unique Known Pairs:       {len(processed_pairs)}",
-            f"- Friendships (Affinity > 40):    {friends}",
-            f"- Enmities (Affinity < -40):      {enemies}",
-            f"- Active Conflicts (Tension >50): {conflicts}",
-            f"- One-way Romance (Romance > 40): {one_way_romance}",
-            f"- Mutual Romance (Romance > 40):  {mutual_romance}",
-            f"- Families / Marriages:           {families}",
-            f"- Unmarried (Single) NPCs:        {singles}",
-            f"- Total Memories Created:         {total_memories}"
+            "[CURRENT STATE]",
+            f"- Friendships Active (>40): {friends}  (Δ: +{len(new_friends)} | -{len(lost_friends)})",
+            f"- Enmities Active (<-40):    {enemies}  (Δ: +{len(new_enmities)} | -{len(resolved_enmities)})",
+            f"- Mutual Romances Active:   {mutual_romance}  (Δ: +{len(new_romances)} | -{len(ended_romances)})",
+            f"- Active Conflicts (>50):   {conflicts}",
+            "",
+            "[FLOW METRICS (Total Accumulated)]",
+            f"- Friendships Created:      {self.flow_friendships_created}",
+            f"- Friendships Lost:         {self.flow_friendships_lost}",
+            f"- Net Friendship Change:    {self.flow_friendships_created - self.flow_friendships_lost}",
+            f"- Enmities Created:         {self.flow_enmities_created}",
+            f"- Enmities Resolved:        {self.flow_enmities_resolved}",
+            f"- Romances Started:         {self.flow_romances_started}",
+            f"- Romances Ended:           {self.flow_romances_ended}",
+            "",
+            "[SYSTEM STATS]",
+            f"- Total Memories Created:   {total_memories}",
+            f"- Average familiars per NPC:{avg_fam:.1f}",
+            f"- Families Active:          {sum(1 for f in getattr(self.sim, 'families', []) if f.get('is_active', 1) == 1)}",
+            f"- Divorces/Breakups:        {sum(1 for f in getattr(self.sim, 'families', []) if f.get('is_active', 1) == 0)}"
         ]
+
+        if warning_msg:
+            metrics.append("")
+            metrics.append(warning_msg)
 
         for m in metrics:
             print(m)
             self.report_log.append(m)
+
 
 
 def main():

@@ -9,7 +9,9 @@ class SocialManager:
 
     def process_social_ticks(self):
         self.tick_counter += 1
-        if self.tick_counter < 10: return
+        if self.tick_counter < 10:
+            return
+
         self.tick_counter = 0
 
         location_groups = {}
@@ -26,8 +28,16 @@ class SocialManager:
 
     def _process_group(self, npcs_in_loc, time_dict):
         for npc_a in npcs_in_loc:
-            initiate_chance = 0.1 + (npc_a.traits.get('sociability', 0) * 0.1)
-            initiate_chance = max(0.05, min(0.3, initiate_chance))
+            # Initiative Check
+            # We add social load pressure. Highly overloaded NPCs might just rest and not initiate
+            rel_mgr = self.simulation.relationship_manager
+
+            # Count active links roughly
+            active_links = sum(1 for r in rel_mgr.get_all_relationships_for(npc_a.id) if abs(r['affinity']) > 20 or r['romantic_interest'] > 20)
+            load_penalty = (active_links / 10.0) * 0.05
+
+            initiate_chance = 0.1 + (npc_a.traits.get('sociability', 0) * 0.1) - load_penalty
+            initiate_chance = max(0.02, min(0.3, initiate_chance)) # Minimum 2% chance to do something
 
             if random.random() > initiate_chance:
                 continue
@@ -65,9 +75,7 @@ class SocialManager:
         context_score = self.simulation.memory_manager.get_context_score(npc_a.id, npc_b.id)
 
         scores = {}
-
-        if rel['familiarity'] == 0:
-            return 'greeting'
+        if rel['familiarity'] == 0: return 'greeting'
 
         chat_score = 30 + (npc_a.traits.get('sociability', 0) * 10) + (rel['familiarity'] * 0.1)
         chat_score += context_score * 5.0
@@ -79,37 +87,33 @@ class SocialManager:
             dt_score += context_score * 10.0
             if dt_score > 0: scores['deep_talk'] = dt_score
 
-        # Argue Feedback Loop Fix:
-        # If Tension is very high, Argue might still be selected, but we reduce its runaway chance
-        # if the person is patient or not very conflict-driven.
         tension_factor = rel['tension']
         if tension_factor > 70 and npc_a.traits.get('conflict', 0) < 0.3:
-            tension_factor = 70 - (tension_factor - 70) # Exhaustion - less likely to argue if not aggressive
+            tension_factor = 70 - (tension_factor - 70)
 
         argue_score = (tension_factor * 0.5) + (npc_a.traits.get('conflict', 0) * 20) - (npc_a.traits.get('patience', 0) * 10) - (rel['trust'] * 0.2)
-        argue_score -= max(-2.0, context_score) * 10.0 # Cap negative context influence to +20 max
+        argue_score -= max(-2.0, context_score) * 10.0
+        if argue_score > 0: scores['argue'] = min(60, argue_score)
 
-        # Ensure argue isn't the ONLY option
-        if argue_score > 0:
-            scores['argue'] = min(60, argue_score) # Cap argue score to 60 so chat (base 30-40) is always possible
-
-        # Romance
         flirt_score = (rel['romantic_interest'] * 0.8) + (npc_a.traits.get('boldness', 0) * 20) + (rel['affinity'] * 0.2)
         flirt_score += context_score * 5.0
         if flirt_score > 0 and npc_a.age >= 18 and npc_b.age >= 18 and rel['romantic_interest'] > 15:
             scores['flirt'] = flirt_score
 
-        if rel['romantic_interest'] > 70 and rel['trust'] > 60 and npc_a.family_id is None and npc_b.family_id is None and npc_a.age >= 18 and npc_b.age >= 18:
+        # Divorce Check (replaces Propose as the only family-related check, Propose remains)
+        if npc_a.family_id is not None and npc_a.family_id == npc_b.family_id:
+            if rel['romantic_interest'] < 20 and rel['affinity'] < 30:
+                divorce_score = 5 + (npc_a.traits.get('boldness', 0) * 20) + (20 - rel['romantic_interest']) + (30 - rel['affinity']) - (context_score * 10)
+                if divorce_score > 0: scores['divorce'] = divorce_score
+
+        elif rel['romantic_interest'] > 70 and rel['trust'] > 60 and npc_a.family_id is None and npc_b.family_id is None and npc_a.age >= 18 and npc_b.age >= 18:
             inclination_a = (npc_a.traits.get('friendliness', 0) + npc_a.traits.get('empathy', 0) + npc_a.traits.get('sociability', 0) - npc_a.traits.get('boldness', 0) * 0.5) / 3.0
             propose_score = 5 + (npc_a.traits.get('boldness', 0) * 20) + (rel['romantic_interest'] - 70) + (rel['trust'] - 60) + (context_score * 10) + (inclination_a * 20)
-            if propose_score > 0:
-                scores['propose'] = propose_score
+            if propose_score > 0: scores['propose'] = propose_score
 
         actions = list(scores.keys())
         weights = list(scores.values())
-
         if not actions: return 'chat'
-
         return random.choices(actions, weights=weights, k=1)[0]
 
     def _resolve_action(self, action_name, npc_a, npc_b, time_dict):
@@ -118,8 +122,8 @@ class SocialManager:
             self._handle_greeting(npc_a, npc_b, time_dict)
             return
 
-        rel_mgr.touch_relationship(npc_a.id, npc_b.id)
-        rel_mgr.touch_relationship(npc_b.id, npc_a.id)
+        rel_mgr.touch_relationship(npc_a.id, npc_b.id, initiator=True)
+        rel_mgr.touch_relationship(npc_b.id, npc_a.id, initiator=False)
 
         comp = CompatibilityManager.calculate_compatibility(npc_a, npc_b)
         rel_a_b = rel_mgr.get_relationship(npc_a.id, npc_b.id)
@@ -127,20 +131,21 @@ class SocialManager:
         context_b_a = self.simulation.memory_manager.get_context_score(npc_b.id, npc_a.id)
         context_a_b = self.simulation.memory_manager.get_context_score(npc_a.id, npc_b.id)
 
+        # Helper for Diminishing Returns
+        def get_gain(base_gain, current_val):
+            return rel_mgr.get_diminishing_returns(base_gain, current_val)
+
         if action_name == 'chat':
             aff_factor_b = max(-15, rel_b_a['affinity']) * 0.1
             ctx_b = max(-2.0, context_b_a)
-
-            # If the initiator is extremely friendly or empathetic, it acts as an "olive branch", reducing the negative impact of tension and memories
             olive_branch = (npc_a.traits.get('friendliness', 0) + npc_a.traits.get('empathy', 0)) * 5.0
 
             success_b = aff_factor_b + (comp * 5) + olive_branch - (rel_b_a['tension'] * 0.05) + (ctx_b * 2.0)
 
             if success_b >= -5:
                 relief_b = 2.0 + (npc_b.traits.get('empathy', 0) * 2.0) + (success_b * 0.2) + (max(0, rel_b_a['trust']) * 0.05)
-                relief_b = max(1.0, relief_b)
-                if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -relief_b)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 0.5)
+                if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -max(1.0, relief_b))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(0.8, rel_b_a['affinity']))
             else:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 1.0)
 
@@ -151,9 +156,8 @@ class SocialManager:
             success_a = aff_factor_a + (comp * 5) + olive_branch_b + (success_b * 0.2) + (ctx_a * 2.0)
             if success_a >= -5:
                 relief_a = 2.0 + (npc_a.traits.get('empathy', 0) * 2.0) + (success_a * 0.2) + (max(0, rel_a_b['trust']) * 0.05)
-                relief_a = max(1.0, relief_a)
-                if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -relief_a)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 0.5)
+                if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -max(1.0, relief_a))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(0.8, rel_a_b['affinity']))
             else:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 1.0)
 
@@ -163,47 +167,39 @@ class SocialManager:
             success_b = (rel_b_a['affinity'] * 0.2) + (comp * 10) + (npc_a.traits.get('friendliness',0) * 5) - (rel_b_a['tension'] * 0.3) + (context_b_a * 5.0)
             if success_b > 0:
                 relief_b = 3.0 + (npc_b.traits.get('empathy', 0) * 2.0) + (success_b * 0.2) + (rel_b_a['trust'] * 0.1)
-                relief_b = max(1.0, relief_b)
-                if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -relief_b)
-
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 2.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', 1.0)
+                if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -max(1.0, relief_b))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(2.5, rel_b_a['affinity']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', get_gain(1.5, rel_b_a['trust']))
             else:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 2.0)
 
             success_a = (rel_a_b['affinity'] * 0.2) + (comp * 10) + (npc_b.traits.get('friendliness',0) * 5) + (success_b * 0.5) + (context_a_b * 5.0)
             if success_a > 0:
                 relief_a = 3.0 + (npc_a.traits.get('empathy', 0) * 2.0) + (success_a * 0.2) + (rel_a_b['trust'] * 0.1)
-                relief_a = max(1.0, relief_a)
-                if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -relief_a)
-
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 2.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', 1.0)
+                if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -max(1.0, relief_a))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(2.5, rel_a_b['affinity']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', get_gain(1.5, rel_a_b['trust']))
             else:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 2.0)
 
             self._check_spark(npc_a, npc_b, comp, success_b, success_a, is_deep_talk=True)
 
         elif action_name == 'argue':
-            # Target B
             if rel_b_a['tension'] < 80:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 5.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -2.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -3.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -get_gain(2.0, rel_b_a['trust']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(4.0, rel_b_a['affinity']))
             else:
-                # Venting/Exhaustion - if tension is already maxed, argue doesn't raise it infinitely,
-                # but might slightly lower it while still hurting affinity
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -1.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -1.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(1.0, rel_b_a['affinity']))
 
-            # Source A
             if rel_a_b['tension'] < 80:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 3.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -1.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -1.0)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -get_gain(1.0, rel_a_b['trust']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(2.0, rel_a_b['affinity']))
             else:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -1.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -0.5)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(0.5, rel_a_b['affinity']))
 
             if rel_b_a['tension'] > 40 or rel_a_b['tension'] > 40:
                 self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Ссора", f"Ссора с {npc_a.first_name}", 0.6, -0.6)
@@ -212,10 +208,10 @@ class SocialManager:
         elif action_name == 'flirt':
             success_b = (rel_b_a['romantic_interest'] * 0.5) + (rel_b_a['affinity'] * 0.2) + (comp * 10) - (rel_b_a['tension'] * 0.5) + (context_b_a * 5.0)
             if success_b > 5:
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'romantic_interest', 5.0)
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 2.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', 5.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 2.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'romantic_interest', get_gain(5.0, rel_b_a['romantic_interest']))
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', get_gain(2.0, rel_b_a['affinity']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', get_gain(5.0, rel_a_b['romantic_interest']))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', get_gain(2.0, rel_a_b['affinity']))
 
                 if success_b > 20 and random.random() < 0.3:
                     self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Флирт", f"Удачный флирт с {npc_a.first_name}", 0.5, 0.7)
@@ -224,7 +220,7 @@ class SocialManager:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 3.0)
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -1.0)
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 5.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', -5.0)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', -get_gain(5.0, rel_a_b['romantic_interest']))
                 self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Отказ", f"{npc_b.first_name} отверг(ла) флирт", 0.7, -0.8)
 
         elif action_name == 'propose':
@@ -232,8 +228,7 @@ class SocialManager:
             success_b = False
             if rel_b_a['romantic_interest'] > 70 and rel_b_a['trust'] > 60 and rel_b_a['tension'] < 30:
                 accept_chance = 0.5 + (inclination_b * 0.5) + (rel_b_a['romantic_interest'] - 70) * 0.01 + (context_b_a * 0.2)
-                if random.random() < accept_chance:
-                    success_b = True
+                if random.random() < accept_chance: success_b = True
 
             if success_b:
                 self.simulation.family_manager.create_family(npc_a, npc_b, time_dict)
@@ -244,9 +239,19 @@ class SocialManager:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 10.0)
                 self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Отказ", f"{npc_b.first_name} отверг(ла) предложение", 0.9, -1.0)
 
+        elif action_name == 'divorce':
+            self.simulation.family_manager.divorce_family(npc_a, npc_b, time_dict)
+
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 40.0)
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -30.0)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 40.0)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -30.0)
+
+            self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Развод", f"Развелся с {npc_b.first_name}", 1.0, -1.0)
+            self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Развод", f"Развелся с {npc_a.first_name}", 1.0, -1.0)
+
     def _check_spark(self, npc_a, npc_b, comp, success_b, success_a, is_deep_talk=False):
         if npc_a.age < 18 or npc_b.age < 18: return
-
         base_chance = 0.25 if is_deep_talk else 0.05
 
         if success_b > 5:

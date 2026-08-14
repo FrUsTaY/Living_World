@@ -23,3 +23,16 @@ class FamilyManager:
 
         bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!")
         bus.publish("family_created", family)
+
+    def divorce_family(self, npc_a, npc_b, time_dict):
+        target_family_id = npc_a.family_id
+        npc_a.family_id = None
+        npc_b.family_id = None
+
+        if hasattr(self.simulation, 'families') and target_family_id is not None:
+            for f in self.simulation.families:
+                if f.get('id') == target_family_id and f.get('is_active', 1) == 1:
+                    f['is_active'] = 0
+                    break
+
+        bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.")

@@ -26,9 +26,10 @@ class FamiliesTab(QWidget):
         layout.addWidget(self.table)
 
     def update_data(self):
-        families = getattr(self.simulation, 'families', [])
+        all_families = getattr(self.simulation, 'families', [])
+        families = [f for f in all_families if f.get('is_active', 1) == 1]
 
-        self.lbl_total.setText(f"Всего семей: {len(families)}")
+        self.lbl_total.setText(f"Всего активных семей: {len(families)}")
 
         self.table.setRowCount(len(families))
 

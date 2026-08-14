@@ -57,7 +57,9 @@ CREATE TABLE IF NOT EXISTS relationships (
     respect REAL,
     romantic_interest REAL,
     tension REAL,
-    last_interaction_time INTEGER DEFAULT 0
+    last_interaction_time INTEGER DEFAULT 0,
+    initiations_sent INTEGER DEFAULT 0,
+    initiations_received INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS memories (
@@ -105,6 +107,10 @@ class Database:
             columns_rel = [info[1] for info in cursor.fetchall()]
             if 'last_interaction_time' not in columns_rel:
                 cursor.execute("ALTER TABLE relationships ADD COLUMN last_interaction_time INTEGER DEFAULT 0")
+            if 'initiations_sent' not in columns_rel:
+                cursor.execute("ALTER TABLE relationships ADD COLUMN initiations_sent INTEGER DEFAULT 0")
+            if 'initiations_received' not in columns_rel:
+                cursor.execute("ALTER TABLE relationships ADD COLUMN initiations_received INTEGER DEFAULT 0")
 
             cursor.execute("PRAGMA table_info(memories)")
             columns_mem = [info[1] for info in cursor.fetchall()]
@@ -162,10 +168,10 @@ class Database:
             for r in relationships:
                 cursor.execute(
                     """INSERT INTO relationships
-                    (source_npc_id, target_npc_id, familiarity, affinity, trust, respect, romantic_interest, tension, last_interaction_time)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (source_npc_id, target_npc_id, familiarity, affinity, trust, respect, romantic_interest, tension, last_interaction_time, initiations_sent, initiations_received)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (r['source_npc_id'], r['target_npc_id'], r['familiarity'], r['affinity'],
-                     r['trust'], r['respect'], r['romantic_interest'], r['tension'], r.get('last_interaction_time', 0))
+                     r['trust'], r['respect'], r['romantic_interest'], r['tension'], r.get('last_interaction_time', 0), r.get('initiations_sent', 0), r.get('initiations_received', 0))
                 )
 
 
