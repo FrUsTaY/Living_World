@@ -6,6 +6,8 @@ from living_world.engine.social.memory_manager import MemoryManager
 from living_world.engine.social.relationship_manager import RelationshipManager
 from living_world.engine.social.social_manager import SocialManager
 from living_world.engine.social.family_manager import FamilyManager
+from living_world.engine.ai.ai_controller import AIController
+from living_world.engine.education.manager import EducationManager
 
 class Simulation:
     def __init__(self):
@@ -22,6 +24,9 @@ class Simulation:
         self.social_manager = SocialManager(self)
         self.family_manager = FamilyManager(self)
         self.families = []
+
+        self.ai_controller = AIController(self)
+        self.education_manager = EducationManager(self)
 
         bus.subscribe("log_event", self._on_log_event)
 
@@ -59,7 +64,8 @@ class Simulation:
             time_dict = self.time.get_time_dict()
 
             # Check for natural death once a day (at midnight, e.g. 00:00)
-            if time_dict['hour'] == 0 and time_dict['minute'] == 0:
+            is_new_day = (time_dict['hour'] == 0 and time_dict['minute'] == 0)
+            if is_new_day:
                 from living_world.engine.life_cycle_manager import LifeCycleManager
                 current_date = self.time.current_datetime
                 for npc in self.npcs:
@@ -72,5 +78,20 @@ class Simulation:
                             bus.publish("log_event", f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.")
 
             for npc in self.npcs:
-                npc.update(time_dict)
+                if is_new_day:
+                    self.education_manager.update_npc_education(npc, time_dict)
+                # 1. Изменение базовых потребностей
+                npc.hunger -= 0.1
+                npc.energy -= 0.05
+                npc.hunger = max(0, min(100, npc.hunger))
+                npc.energy = max(0, min(100, npc.energy))
+                npc.mood = (npc.hunger + npc.energy) / 2
+
+                # 2. Выбор и выполнение действия через Utility AI
+                self.ai_controller.choose_and_execute_action(npc, time_dict)
+
+                # Логируем смену состояния
+                if npc.state != getattr(npc, '_last_state', None):
+                    bus.publish("log_event", f"{npc.get_full_name()} переходит в состояние: {npc.state}")
+                npc._last_state = npc.state
             self.social_manager.process_social_ticks()

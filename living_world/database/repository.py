@@ -30,7 +30,12 @@ CREATE TABLE IF NOT EXISTS npcs (
     trait_empathy REAL,
     trait_boldness REAL,
     trait_patience REAL,
-    family_id TEXT
+    family_id TEXT,
+    date_of_birth TEXT,
+    date_of_death TEXT,
+    is_alive INTEGER,
+    current_education_id TEXT,
+    education_status TEXT
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -81,6 +86,34 @@ CREATE TABLE IF NOT EXISTS families (
     creation_time TEXT,
     is_active INTEGER
 );
+
+CREATE TABLE IF NOT EXISTS educational_institutions (
+    id TEXT PRIMARY KEY,
+    type TEXT,
+    name TEXT,
+    capacity INTEGER,
+    building_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS education_programs (
+    id TEXT PRIMARY KEY,
+    institution_id TEXT,
+    name TEXT,
+    type TEXT,
+    duration INTEGER,
+    requirements TEXT
+);
+
+CREATE TABLE IF NOT EXISTS education_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    npc_id TEXT,
+    institution_id TEXT,
+    program_id TEXT,
+    start_date TEXT,
+    end_date TEXT,
+    status TEXT,
+    qualification TEXT
+);
 """
 
 class Database:
@@ -110,7 +143,12 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN date_of_death TEXT DEFAULT NULL")
                 cursor.execute("ALTER TABLE npcs ADD COLUMN is_alive INTEGER DEFAULT 1")
 
-                # Fetch sim_time from meta to calculate date_of_birth for existing NPCs
+            if 'current_education_id' not in columns:
+                 cursor.execute("ALTER TABLE npcs ADD COLUMN current_education_id TEXT DEFAULT NULL")
+                 cursor.execute("ALTER TABLE npcs ADD COLUMN education_status TEXT DEFAULT NULL")
+
+            # Fetch sim_time from meta to calculate date_of_birth for existing NPCs
+            if 'date_of_birth' not in columns:
                 cursor.execute("SELECT value FROM meta WHERE key = 'sim_time'")
                 row = cursor.fetchone()
                 current_date = datetime(2000, 1, 1, 8, 0)
@@ -158,16 +196,47 @@ class Database:
             if 'valence' not in columns_mem:
                 cursor.execute("ALTER TABLE memories ADD COLUMN valence REAL DEFAULT 0.0")
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
+        if educational_institutions is None: educational_institutions = []
+        if education_programs is None: education_programs = []
+        if education_history is None: education_history = []
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
 
             # Сохраняем мету (время)
             cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("sim_time", json.dumps(sim_time)))
+
+            # Сохраняем образование
+            cursor.execute("DELETE FROM educational_institutions")
+            for inst in educational_institutions:
+                cursor.execute(
+                    "INSERT INTO educational_institutions (id, type, name, capacity, building_id) VALUES (?, ?, ?, ?, ?)",
+                    (inst.id, inst.type, inst.name, inst.capacity, inst.building_id)
+                )
+
+            cursor.execute("DELETE FROM education_programs")
+            for prog in education_programs:
+                cursor.execute(
+                    "INSERT INTO education_programs (id, institution_id, name, type, duration, requirements) VALUES (?, ?, ?, ?, ?, ?)",
+                    (prog.id, prog.institution_id, prog.name, prog.type, prog.duration, json.dumps(prog.requirements))
+                )
+
+            cursor.execute("DELETE FROM education_history")
+            for hist in education_history:
+                if isinstance(hist, dict):
+                     cursor.execute(
+                         "INSERT INTO education_history (npc_id, institution_id, program_id, start_date, end_date, status, qualification) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (hist['npc_id'], hist['institution_id'], hist['program_id'], hist['start_date'], hist['end_date'], hist['status'], hist.get('qualification'))
+                     )
+                else:
+                     cursor.execute(
+                         "INSERT INTO education_history (npc_id, institution_id, program_id, start_date, end_date, status, qualification) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                         (hist.npc_id, hist.institution_id, hist.program_id, hist.start_date, hist.end_date, hist.status, getattr(hist, 'qualification', None))
+                     )
 
             # Сохраняем здания
             cursor.execute("DELETE FROM buildings")
@@ -184,8 +253,8 @@ class Database:
                     """INSERT INTO npcs
                     (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
                     trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, family_id,
-                    date_of_birth, date_of_death, is_alive)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    date_of_birth, date_of_death, is_alive, current_education_id, education_status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -196,8 +265,10 @@ class Database:
                      npc.traits.get('patience', 0.0) if hasattr(npc, 'traits') else 0.0,
                      npc.family_id if hasattr(npc, 'family_id') else None,
                      npc.date_of_birth.isoformat() if npc.date_of_birth else None,
-                     npc.date_of_death.isoformat() if npc.date_of_death else None,
-                     1 if npc.is_alive else 0)
+                     npc.date_of_death.isoformat() if getattr(npc, 'date_of_death', None) else None,
+                     1 if getattr(npc, 'is_alive', True) else 0,
+                     getattr(npc, 'current_education_id', None),
+                     getattr(npc, 'education_status', None))
                 )
 
             # Сохраняем семьи
@@ -244,6 +315,15 @@ class Database:
             row = cursor.fetchone()
             sim_time = json.loads(row['value']) if row else None
 
+            cursor.execute("SELECT * FROM educational_institutions")
+            educational_institutions = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT * FROM education_programs")
+            education_programs = [dict(r) for r in cursor.fetchall()]
+
+            cursor.execute("SELECT * FROM education_history ORDER BY id ASC")
+            education_history = [dict(r) for r in cursor.fetchall()]
+
             cursor.execute("SELECT * FROM buildings")
             buildings = [dict(r) for r in cursor.fetchall()]
 
@@ -263,4 +343,4 @@ class Database:
             cursor.execute("SELECT * FROM memories ORDER BY id ASC")
             memories = [dict(r) for r in cursor.fetchall()]
 
-            return sim_time, buildings, npcs, events, families, relationships, memories
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history

@@ -33,6 +33,9 @@ class NPC:
         self.traits = traits or self._generate_traits()
         self.family_id = family_id
 
+        self.current_education_id = None
+        self.education_status = None
+
         self._last_state = self.state
 
         # Cache for age, to avoid recalculating if time hasn't changed.
@@ -65,119 +68,7 @@ class NPC:
         return f"{self.first_name} {self.last_name}"
 
     def update(self, time_dict):
-        if not self.is_alive:
-            return
-
-        hour = time_dict['hour']
-        minute = time_dict['minute']
-        current_world_date = datetime(
-            time_dict.get('year', 2000),
-            time_dict.get('month', 1),
-            time_dict.get('day', 1),
-            hour,
-            minute
-        )
-
-        life_stage = self.get_life_stage(current_world_date)
-
-        # 1. Изменение потребностей
-        self.hunger -= 0.1 # Голодает постепенно
-        self.energy -= 0.05
-
-        # Ограничения
-        self.hunger = max(0, min(100, self.hunger))
-        self.energy = max(0, min(100, self.energy))
-
-        # Настроение зависит от голода и энергии
-        self.mood = (self.hunger + self.energy) / 2
-
-        # 2. Логика поведения на основе весов и потребностей
-        # Определяем базовые веса для каждого действия
-        weights = {
-            "Спит": 0,
-            "Ест": 0,
-            "Работает": 0,
-            "Отдыхает": 0,
-            "Играет": 0,
-            "Общается": 0
-        }
-
-        # Гистерезис
-        if self.state == "Ест" and self.hunger < 95:
-            self.hunger += 2.0
-            # Continuing eating is guaranteed
-            weights["Ест"] = 1000
-        else:
-            # Сон
-            if hour >= 22 or hour < 7:
-                weights["Спит"] += 100
-                if life_stage in [LifeStage.BABY, LifeStage.CHILD]:
-                    weights["Спит"] += 50 # Children sleep more deeply/reliably
-                if self.energy < 30:
-                    weights["Спит"] += 50
-            else:
-                if self.energy < 20:
-                     weights["Спит"] += 50 # Nap
-
-            # Еда
-            if self.hunger < 30:
-                weights["Ест"] += 150
-            elif self.hunger < 60:
-                weights["Ест"] += 50
-
-            # Работа / Учеба (будущая система)
-            if 8 <= hour < 17:
-                if life_stage in [LifeStage.YOUNG_ADULT, LifeStage.ADULT]:
-                    weights["Работает"] += 80
-                    # Влияние характера
-                    if self.traits['patience'] > 0:
-                        weights["Работает"] += 20
-                elif life_stage in [LifeStage.ELDER]:
-                    # Пожилые могут работать, но с меньшей вероятностью
-                    weights["Работает"] += 30
-                    weights["Отдыхает"] += 50
-                elif life_stage in [LifeStage.CHILD, LifeStage.SCHOOL, LifeStage.TEEN]:
-                    # Пока нет школы, они играют/учатся дома
-                    weights["Играет"] += 60
-                    weights["Отдыхает"] += 20
-                elif life_stage == LifeStage.BABY:
-                    weights["Отдыхает"] += 50
-
-            # Свободное время
-            if 17 <= hour < 22 or 7 <= hour < 8:
-                if life_stage in [LifeStage.BABY, LifeStage.CHILD]:
-                    weights["Играет"] += 80
-                else:
-                    weights["Отдыхает"] += 50
-                    if self.traits['sociability'] > 0.5:
-                        weights["Общается"] += 30
-                    if life_stage == LifeStage.TEEN:
-                        weights["Общается"] += 40
-
-        # Если ни один вес не сработал (например, все 0), добавляем дефолтное
-        if max(weights.values()) == 0:
-             weights["Отдыхает"] = 10
-
-        # Выбираем действие с максимальным весом
-        best_action = max(weights, key=weights.get)
-
-        # Применяем действие
-        self.state = best_action
-
-        if self.state == "Спит":
-            self._move_to(self.home_id)
-            self.energy += 0.3
-        elif self.state == "Работает":
-            self._move_to(self.work_id)
-            self.energy -= 0.1
-        else: # Ест, Отдыхает, Играет, Общается
-            self._move_to(self.home_id)
-
-        # Проверка на изменение состояния для логирования
-        if self.state != self._last_state:
-            state_text = self.state.lower()
-            bus.publish("log_event", f"{self.get_full_name()} теперь {state_text}.")
-            self._last_state = self.state
+        pass # Updated via Simulation.ai_controller
 
     def _move_to(self, location_id):
         if self.current_location != location_id:
