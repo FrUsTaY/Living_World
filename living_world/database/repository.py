@@ -105,6 +105,45 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN trait_patience REAL DEFAULT 0.0")
                 cursor.execute("ALTER TABLE npcs ADD COLUMN family_id TEXT DEFAULT NULL")
 
+            if 'date_of_birth' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN date_of_birth TEXT DEFAULT NULL")
+                cursor.execute("ALTER TABLE npcs ADD COLUMN date_of_death TEXT DEFAULT NULL")
+                cursor.execute("ALTER TABLE npcs ADD COLUMN is_alive INTEGER DEFAULT 1")
+
+                # Fetch sim_time from meta to calculate date_of_birth for existing NPCs
+                cursor.execute("SELECT value FROM meta WHERE key = 'sim_time'")
+                row = cursor.fetchone()
+                current_date = datetime(2000, 1, 1, 8, 0)
+                if row:
+                    try:
+                        time_dict = json.loads(row[0])
+                        if 'year' in time_dict and 'month' in time_dict:
+                            current_date = datetime(
+                                time_dict.get('year', 2000),
+                                time_dict.get('month', 1),
+                                time_dict.get('day', 1),
+                                time_dict.get('hour', 8),
+                                time_dict.get('minute', 0)
+                            )
+                        else:
+                            from datetime import timedelta
+                            day = time_dict.get('day', 1)
+                            hour = time_dict.get('hour', 8)
+                            minute = time_dict.get('minute', 0)
+                            delta = timedelta(days=day - 1, hours=hour - 8, minutes=minute)
+                            current_date = current_date + delta
+                    except Exception:
+                        pass
+
+                # Migrate existing NPCs
+                cursor.execute("SELECT id, age FROM npcs")
+                existing_npcs = cursor.fetchall()
+                from datetime import timedelta
+                for npc_id, age in existing_npcs:
+                    if age is not None:
+                        dob = current_date - timedelta(days=int(age) * 365)
+                        cursor.execute("UPDATE npcs SET date_of_birth = ?, is_alive = 1 WHERE id = ?", (dob.isoformat(), npc_id))
+
             cursor.execute("PRAGMA table_info(relationships)")
             columns_rel = [info[1] for info in cursor.fetchall()]
             if 'last_interaction_time' not in columns_rel:
@@ -143,10 +182,11 @@ class Database:
             for npc in npcs:
                 cursor.execute(
                     """INSERT INTO npcs
-                    (id, first_name, last_name, age, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
-                    trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, family_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (npc.id, npc.first_name, npc.last_name, npc.age, npc.gender, npc.profession,
+                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
+                    trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, family_id,
+                    date_of_birth, date_of_death, is_alive)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
                      npc.traits.get('friendliness', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -154,7 +194,10 @@ class Database:
                      npc.traits.get('empathy', 0.0) if hasattr(npc, 'traits') else 0.0,
                      npc.traits.get('boldness', 0.0) if hasattr(npc, 'traits') else 0.0,
                      npc.traits.get('patience', 0.0) if hasattr(npc, 'traits') else 0.0,
-                     npc.family_id if hasattr(npc, 'family_id') else None)
+                     npc.family_id if hasattr(npc, 'family_id') else None,
+                     npc.date_of_birth.isoformat() if npc.date_of_birth else None,
+                     npc.date_of_death.isoformat() if npc.date_of_death else None,
+                     1 if npc.is_alive else 0)
                 )
 
             # Сохраняем семьи

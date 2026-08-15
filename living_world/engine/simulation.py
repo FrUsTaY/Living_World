@@ -57,6 +57,20 @@ class Simulation:
         # Будем считать, что при вызове update() проходит 1 минута игрового времени
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
+
+            # Check for natural death once a day (at midnight, e.g. 00:00)
+            if time_dict['hour'] == 0 and time_dict['minute'] == 0:
+                from living_world.engine.life_cycle_manager import LifeCycleManager
+                current_date = self.time.current_datetime
+                for npc in self.npcs:
+                    if npc.is_alive:
+                        age = npc.get_age(current_date)
+                        if LifeCycleManager.check_natural_death(age):
+                            npc.is_alive = False
+                            npc.date_of_death = current_date
+                            npc.state = "Умер"
+                            bus.publish("log_event", f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.")
+
             for npc in self.npcs:
                 npc.update(time_dict)
             self.social_manager.process_social_ticks()

@@ -32,7 +32,16 @@ def generate_initial_world(city, simulation, num_npcs=25):
             first_name = random.choice(FEMALE_FIRST_NAMES)
             last_name = random.choice(LAST_NAMES) + "а"
 
+        # Generate age safely (YOUNG_ADULT and ADULT) to avoid independent children
         age = random.randint(20, 50)
+
+        # Calculate date_of_birth relative to the simulation start time
+        current_date = simulation.time.current_datetime
+        from datetime import timedelta
+        # Simple approximation, adding a bit of randomness to days so birthdays aren't all on Jan 1
+        days_old = int(age * 365.25) + random.randint(-180, 180)
+        date_of_birth = current_date - timedelta(days=days_old)
+
         profession = random.choice(PROFESSIONS)
 
         # Находим дом со свободными местами
@@ -50,7 +59,7 @@ def generate_initial_world(city, simulation, num_npcs=25):
 
         work = random.choice(works)
 
-        npc = NPC(first_name, last_name, age, gender, profession, home.id, work.id)
+        npc = NPC(first_name, last_name, date_of_birth, gender, profession, home.id, work.id)
         # Немного рандомизируем начальные потребности
         npc.hunger = random.uniform(70, 100)
         npc.energy = random.uniform(70, 100)
