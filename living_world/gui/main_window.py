@@ -177,15 +177,36 @@ class MainWindow(QMainWindow):
                     return
 
                 self.sim = Simulation()
-                self.sim.time.set_time(time_dict['day'], time_dict['hour'], time_dict['minute'])
+                self.sim.time.set_time_from_dict(time_dict)
 
                 from living_world.city.city import Building
                 for b in b_dicts:
                     self.sim.city.add_building(Building(b['name'], b['type'], b['capacity'], b['id']))
 
                 from living_world.population.npc import NPC
+                from datetime import datetime
                 for nd in npc_dicts:
-                    npc = NPC(nd['first_name'], nd['last_name'], nd['age'], nd['gender'], nd['profession'], nd['home_id'], nd['work_id'], nd['id'])
+                    dob = None
+                    if nd.get('date_of_birth'):
+                        try:
+                            dob = datetime.fromisoformat(nd['date_of_birth'])
+                        except:
+                            pass
+
+                    if not dob:
+                        # Fallback for very old saves that somehow bypassed migration
+                        dob = self.sim.time.current_datetime
+
+                    npc = NPC(nd['first_name'], nd['last_name'], dob, nd['gender'], nd['profession'], nd['home_id'], nd['work_id'], nd['id'])
+
+                    if nd.get('date_of_death'):
+                        try:
+                            npc.date_of_death = datetime.fromisoformat(nd['date_of_death'])
+                        except:
+                            pass
+
+                    npc.is_alive = bool(nd.get('is_alive', 1))
+
                     npc.money = nd['money']
                     npc.hunger = nd['hunger']
                     npc.energy = nd['energy']

@@ -17,6 +17,7 @@ class SocialManager:
 
         location_groups = {}
         for npc in self.simulation.npcs:
+            if not getattr(npc, 'is_alive', True): continue
             loc = npc.current_location
             if not loc: continue
             if loc not in location_groups: location_groups[loc] = []
@@ -272,7 +273,8 @@ class SocialManager:
             self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Развод", f"Развелся с {npc_a.first_name}", 1.0, -1.0)
 
     def _check_spark(self, npc_a, npc_b, comp, success_b, success_a, is_deep_talk=False):
-        if npc_a.age < 18 or npc_b.age < 18: return
+        current_date = self.simulation.time.current_datetime
+        if npc_a.get_age(current_date) < 18 or npc_b.get_age(current_date) < 18: return
         base_chance = 0.25 if is_deep_talk else 0.05
 
         if success_b > 5:

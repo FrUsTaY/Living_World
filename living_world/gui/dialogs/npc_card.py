@@ -32,7 +32,8 @@ class NPCCardDialog(QDialog):
         self.form = QFormLayout()
         self.labels = {}
 
-        data = self.npc.to_dict(self.city)
+        current_date = self.sim.time.current_datetime if self.sim else None
+        data = self.npc.to_dict(self.city, current_world_date=current_date)
         for key, value in data.items():
             val_label = QLabel(str(value))
             self.labels[key] = val_label
@@ -120,7 +121,10 @@ class NPCCardDialog(QDialog):
             self.mem_list.addItem(item_text)
 
     def update_data(self):
-        data = self.npc.to_dict(self.city)
+        current_date = self.sim.time.current_datetime if self.sim else None
+        data = self.npc.to_dict(self.city, current_world_date=current_date)
+
+        # If dict keys change (shouldn't really happen but to be safe)
         for key, value in data.items():
             if key in self.labels:
                 self.labels[key].setText(str(value))
