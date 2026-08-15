@@ -47,15 +47,16 @@ def test_life_cycle_integration():
     sim.time.current_datetime = datetime(2001, 1, 1, 14, 0)
     time_dict = sim.time.get_time_dict()
 
-    baby.update(time_dict)
-    adult.update(time_dict)
+    sim.ai_controller.choose_and_execute_action(baby, time_dict)
+    sim.ai_controller.choose_and_execute_action(adult, time_dict)
 
     assert baby.state in ["Отдыхает", "Играет", "Ест", "Спит"]
     # Adult has high probability of working, but might be resting if tired, let's force high energy
     adult.energy = 100
     adult.hunger = 100
-    adult.update(time_dict)
+    sim.ai_controller.choose_and_execute_action(adult, time_dict)
     assert adult.state == "Работает"
 
 if __name__ == "__main__":
-    pytest.main(["-v", __file__])
+    test_life_cycle_integration()
+    print("Integration tests passed!")

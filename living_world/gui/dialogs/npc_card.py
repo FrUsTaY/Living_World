@@ -17,6 +17,7 @@ class NPCCardDialog(QDialog):
 
         self._init_general_tab()
         self._init_traits_tab()
+        self._init_education_tab()
         self._init_relationships_tab()
         self._init_memory_tab()
 
@@ -42,6 +43,60 @@ class NPCCardDialog(QDialog):
         layout.addLayout(self.form)
         self.tabs.addTab(tab, "Общая информация")
 
+    def _init_education_tab(self):
+        self.edu_tab = QWidget()
+        layout = QVBoxLayout(self.edu_tab)
+
+        self.edu_info = QLabel("Загрузка...")
+        self.edu_info.setWordWrap(True)
+        layout.addWidget(self.edu_info)
+
+        self.edu_history_table = QTableWidget()
+        self.edu_history_table.setColumnCount(4)
+        self.edu_history_table.setHorizontalHeaderLabels(["Учреждение", "Программа", "Статус", "Квалификация"])
+        self.edu_history_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.edu_history_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        layout.addWidget(self.edu_history_table)
+        self.tabs.addTab(self.edu_tab, "Образование")
+        self._populate_education()
+
+    def _populate_education(self):
+        if not self.sim or not getattr(self.sim, 'education_manager', None):
+            self.edu_info.setText("Система образования недоступна.")
+            return
+
+        em = self.sim.education_manager
+
+        status_text = "<b>Текущее состояние:</b><br>"
+        if getattr(self.npc, 'education_status', None) == "Обучается" and getattr(self.npc, 'current_education_id', None):
+            prog = em.programs.get(self.npc.current_education_id)
+            if prog:
+                inst = em.institutions.get(prog.institution_id)
+                inst_name = inst.name if inst else "Неизвестно"
+                status_text += f"Учится в {inst_name} на программе '{prog.name}'."
+            else:
+                status_text += "Обучается (программа неизвестна)."
+        else:
+            status_text += "Не обучается в данный момент."
+
+        self.edu_info.setText(status_text)
+
+        # История
+        records = [r for r in em.history if r.npc_id == self.npc.id]
+        self.edu_history_table.setRowCount(len(records))
+        for row, r in enumerate(records):
+            inst = em.institutions.get(r.institution_id)
+            prog = em.programs.get(r.program_id)
+
+            inst_name = inst.name if inst else "Неизвестно"
+            prog_name = prog.name if prog else "Неизвестно"
+
+            self.edu_history_table.setItem(row, 0, QTableWidgetItem(inst_name))
+            self.edu_history_table.setItem(row, 1, QTableWidgetItem(prog_name))
+            self.edu_history_table.setItem(row, 2, QTableWidgetItem(r.status))
+            self.edu_history_table.setItem(row, 3, QTableWidgetItem(r.qualification or "-"))
+
     def _init_traits_tab(self):
         tab = QWidget()
         layout = QFormLayout(tab)
@@ -52,18 +107,14 @@ class NPCCardDialog(QDialog):
             'conflict': 'Конфликтность',
             'empathy': 'Эмпатия',
             'boldness': 'Смелость',
-            'patience': 'Терпеливость'
+            'patience': 'Терпение'
         }
 
         for key, name in traits_map.items():
-            val = self.npc.traits.get(key, 0.0)
-            # Convert -1.0 to 1.0 to 0-100 for display
-            percent = int((val + 1.0) / 2.0 * 100)
-
+            val = self.npc.traits.get(key, 0)
             bar = QProgressBar()
-            bar.setRange(0, 100)
-            bar.setValue(percent)
-
+            bar.setRange(-100, 100)
+            bar.setValue(int(val * 100))
             layout.addRow(QLabel(name), bar)
 
         self.tabs.addTab(tab, "Характер")
@@ -104,20 +155,22 @@ class NPCCardDialog(QDialog):
             name = target.get_full_name() if target else "Неизвестный"
 
             self.rel_table.setItem(row, 0, QTableWidgetItem(name))
-            self.rel_table.setItem(row, 1, QTableWidgetItem(f"{int(rel['familiarity'])}%"))
-            self.rel_table.setItem(row, 2, QTableWidgetItem(f"{int(rel['affinity'])}%"))
-            self.rel_table.setItem(row, 3, QTableWidgetItem(f"{int(rel['trust'])}%"))
+            self.rel_table.setItem(row, 1, QTableWidgetItem(f"{rel['familiarity']:.1f}"))
+            self.rel_table.setItem(row, 2, QTableWidgetItem(f"{rel['affinity']:.1f}"))
+            self.rel_table.setItem(row, 3, QTableWidgetItem(f"{rel['trust']:.1f}"))
 
     def _populate_memories(self):
         if not self.sim: return
-        memories = self.sim.memory_manager.get_memories_for(self.npc.id)
-
         self.mem_list.clear()
-        for mem in reversed(memories): # Show newest first
-            target = next((n for n in self.sim.npcs if n.id == mem['target_npc_id']), None)
-            target_name = target.get_full_name() if target else ""
+        memories = self.sim.memory_manager.get_memories(self.npc.id)
+        for mem in reversed(memories[-50:]): # Show last 50
+            target_str = ""
+            if mem['target_npc_id']:
+                target = next((n for n in self.sim.npcs if n.id == mem['target_npc_id']), None)
+                if target:
+                    target_str = f" → {target.get_full_name()}"
 
-            item_text = f"[{mem['sim_time']}] {mem['event_type']}: {mem['description']}"
+            item_text = f"[{mem['time']}] {mem['event_type']}{target_str}\n{mem['description']}"
             self.mem_list.addItem(item_text)
 
     def update_data(self):
@@ -132,6 +185,8 @@ class NPCCardDialog(QDialog):
         # To avoid UI flickering, we only fully re-populate if tab is visible,
         # but for simplicity let's just re-populate
         if self.tabs.currentIndex() == 2:
-            self._populate_relationships()
+            self._populate_education()
         elif self.tabs.currentIndex() == 3:
+            self._populate_relationships()
+        elif self.tabs.currentIndex() == 4:
             self._populate_memories()
