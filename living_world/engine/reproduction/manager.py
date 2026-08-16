@@ -152,6 +152,7 @@ class ReproductionManager:
              father_id=father.id if father else None,
              family_id=mother.family_id
         )
+        baby.household_id = getattr(mother, 'household_id', None)
         baby.money = 0.0
 
         self.simulation.add_npc(baby)

@@ -154,6 +154,7 @@ class MainWindow(QMainWindow):
             db = Database(file_path)
             try:
                 edu_inst = getattr(self.sim, 'education_manager', None)
+                households_to_save = list(self.sim.household_manager.households.values()) if hasattr(self.sim, 'household_manager') else []
                 db.save_world(
                     self.sim.time.get_time_dict(),
                     self.sim.npcs,
@@ -165,7 +166,8 @@ class MainWindow(QMainWindow):
                     list(edu_inst.institutions.values()) if edu_inst else [],
                     list(edu_inst.programs.values()) if edu_inst else [],
                     [r.to_dict() for r in getattr(edu_inst, 'history', [])] if edu_inst else [],
-                    getattr(self.sim, 'reproduction_manager', None).active_pregnancies if hasattr(self.sim, 'reproduction_manager') else []
+                    getattr(self.sim, 'reproduction_manager', None).active_pregnancies if hasattr(self.sim, 'reproduction_manager') else [],
+                    households_to_save
                 )
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
@@ -176,7 +178,7 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted and dialog.selected_file:
             db = Database(dialog.selected_file)
             try:
-                time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts = db.load_world()
+                time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts = db.load_world()
                 if not time_dict:
                     QMessageBox.warning(self, "Загрузка", "В файле нет сохраненного мира.")
                     return
@@ -187,6 +189,13 @@ class MainWindow(QMainWindow):
                 from living_world.city.city import Building
                 for b in b_dicts:
                     self.sim.city.add_building(Building(b['name'], b['type'], b['capacity'], b['id']))
+
+                # Recreate households
+                if hasattr(self.sim, 'household_manager') and households_dicts:
+                    from living_world.engine.social.household import Household
+                    for hh_dict in households_dicts:
+                        hh = Household.from_dict(hh_dict)
+                        self.sim.household_manager.add_household(hh)
 
                 from living_world.population.npc import NPC
                 from datetime import datetime
@@ -215,6 +224,8 @@ class MainWindow(QMainWindow):
 
                     npc.current_education_id = nd.get('current_education_id')
                     npc.education_status = nd.get('education_status')
+
+                    npc.household_id = nd.get('household_id')
 
                     npc.money = nd['money']
                     npc.hunger = nd['hunger']

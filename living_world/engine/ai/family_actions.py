@@ -7,14 +7,19 @@ class CareForChildAction(Action):
         return "Заботится о ребенке"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
-        # Ухаживать могут только YOUNG_ADULT, ADULT, ELDER (TEEN - опционально в будущем)
+        # Ухаживать могут только YOUNG_ADULT, ADULT, ELDER
         stage = npc.get_life_stage(simulation.time.current_datetime)
         if stage in [LifeStage.BABY, LifeStage.CHILD, LifeStage.SCHOOL, LifeStage.TEEN, LifeStage.DEAD]:
             return False
 
-        # Есть ли дети, нуждающиеся в уходе (в данном случае - младенцы)
-        children = simulation.family_manager.get_children(npc.id)
-        for child in children:
+        # Ищем младенцев, нуждающихся в уходе.
+        # Приоритет - биологические дети (где бы они ни были) или любые дети в собственном домохозяйстве
+        biological_children = simulation.family_manager.get_children(npc.id)
+        household_children = simulation.household_manager.get_children(npc.household_id) if getattr(npc, 'household_id', None) else []
+
+        all_potential_children = set(biological_children + household_children)
+
+        for child in all_potential_children:
             if not child.is_alive: continue
             child_stage = child.get_life_stage(simulation.time.current_datetime)
             if child_stage == LifeStage.BABY:
@@ -25,15 +30,26 @@ class CareForChildAction(Action):
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         utility = 0.0
 
-        # Получаем всех детей-младенцев
-        children = simulation.family_manager.get_children(npc.id)
-        babies = [c for c in children if c.is_alive and c.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY]
+        # Получаем всех младенцев, о которых этот NPC мог бы позаботиться
+        biological_children = simulation.family_manager.get_children(npc.id)
+        household_children = simulation.household_manager.get_children(npc.household_id) if getattr(npc, 'household_id', None) else []
+
+        all_potential_children = set(biological_children + household_children)
+
+        babies = [c for c in all_potential_children if c.is_alive and c.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY]
 
         if not babies:
             return 0.0
 
         # Находим младенца с наибольшей потребностью в уходе
-        target_baby = max(babies, key=lambda b: max(100 - b.hunger, 100 - b.mood))
+        # Добавляем небольшой вес, если ребенок в том же домохозяйстве, и еще бОльший вес - если это биологический ребенок
+        def baby_priority(b):
+            base_need = max(100 - b.hunger, 100 - b.mood)
+            is_bio = 1 if (b.mother_id == npc.id or b.father_id == npc.id) else 0
+            is_same_hh = 1 if getattr(b, 'household_id', None) == getattr(npc, 'household_id', None) else 0
+            return base_need + (is_bio * 50) + (is_same_hh * 20)
+
+        target_baby = max(babies, key=baby_priority)
 
         # Базовая мотивация: если ребёнок голоден или плачет (плохое настроение)
         hunger_deficit = 100 - target_baby.hunger
@@ -65,18 +81,34 @@ class CareForChildAction(Action):
         empathy = npc.traits.get('empathy', 0)
         utility += empathy * 20
 
-        # Учет наличия второго родителя
-        parents = simulation.family_manager.get_parents(target_baby.id)
-        other_parent = next((p for p in parents if p.id != npc.id and p.is_alive), None)
+        # Штрафуем не-биологических родителей (приоритет отдается биологическим)
+        is_biological_parent = (target_baby.mother_id == npc.id or target_baby.father_id == npc.id)
+        if not is_biological_parent:
+            utility *= 0.5 # Снижаем мотивацию, чтобы био родители отреагировали первыми
 
-        if other_parent:
-            # Если другой родитель жив, делим ответственность
-            # Если другой родитель рядом, снижаем utility, чтобы они не бросались одновременно
-            if other_parent.current_location == target_baby.current_location:
-                 utility *= 0.6
+        # Учет наличия других способных взрослых опекунов (био родителей или других взрослых из домохозяйства)
+        parents = simulation.family_manager.get_parents(target_baby.id)
+        living_bio_parents = [p for p in parents if p.is_alive]
+
+        household_adults = simulation.household_manager.get_adults(getattr(target_baby, 'household_id', None)) if getattr(target_baby, 'household_id', None) else []
+
+        # Кто потенциально может заботиться? Био родители + взрослые в домохозяйстве
+        potential_caregivers = set(living_bio_parents + household_adults)
+        other_caregivers = [c for c in potential_caregivers if c.id != npc.id and c.is_alive]
+
+        if other_caregivers:
+            # Если рядом есть другие потенциальные опекуны (особенно био родители)
+            nearby_caregivers = [c for c in other_caregivers if c.current_location == target_baby.current_location]
+
+            # Если npc не является био родителем, но рядом есть живой био родитель, сильно снижаем utility
+            if not is_biological_parent and any((p.id == target_baby.mother_id or p.id == target_baby.father_id) for p in nearby_caregivers):
+                utility *= 0.2
+            elif nearby_caregivers:
+                # Кто-то другой рядом (даже если оба био родители или оба не био)
+                utility *= 0.6
             else:
-                 # Если другой родитель далеко, берем больше ответственности на себя, но все же меньше чем мать/отец-одиночка
-                 utility *= 0.8
+                # Опекуны есть, но они далеко
+                utility *= 0.8
 
         # Сохраняем target_baby, чтобы использовать его в execute()
         npc._target_baby_id = target_baby.id

@@ -22,6 +22,12 @@ def generate_initial_world(city, simulation, num_npcs=25):
 
     # Счетчик населения в каждом доме
     home_occupants = {h.id: 0 for h in homes}
+    home_households = {}
+
+    # Заранее создаем домохозяйства для начальных домов
+    for h in homes:
+        hh = simulation.household_manager.create_household(h.id)
+        home_households[h.id] = hh.id
 
     for _ in range(num_npcs):
         gender = random.choice(["М", "Ж"])
@@ -52,6 +58,11 @@ def generate_initial_world(city, simulation, num_npcs=25):
             city.add_building(new_home)
             homes.append(new_home)
             home_occupants[new_home.id] = 0
+
+            # Создаем новое домохозяйство
+            hh = simulation.household_manager.create_household(new_home.id)
+            home_households[new_home.id] = hh.id
+
             available_homes = [new_home]
 
         home = random.choice(available_homes)
@@ -60,6 +71,8 @@ def generate_initial_world(city, simulation, num_npcs=25):
         work = random.choice(works)
 
         npc = NPC(first_name, last_name, date_of_birth, gender, profession, home.id, work.id)
+        npc.household_id = home_households[home.id]
+
         # Немного рандомизируем начальные потребности
         npc.hunger = random.uniform(70, 100)
         npc.energy = random.uniform(70, 100)

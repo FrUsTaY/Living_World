@@ -165,6 +165,21 @@ class NPCCardDialog(QDialog):
         self.family_tab = QWidget()
         layout = QVBoxLayout(self.family_tab)
 
+        # Блок "Домохозяйство"
+        self.household_info = QLabel("Домохозяйство: загрузка...")
+        self.household_info.setWordWrap(True)
+        layout.addWidget(self.household_info)
+
+        self.household_table = QTableWidget()
+        self.household_table.setColumnCount(4)
+        self.household_table.setHorizontalHeaderLabels(["Роль", "Имя", "Возраст/Этап", "Статус"])
+        self.household_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.household_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        layout.addWidget(self.household_table)
+
+        layout.addWidget(QLabel("<b>Биологические связи</b>"))
+
+        # Блок "Семья" (биологическая)
         self.family_table = QTableWidget()
         self.family_table.setColumnCount(4)
         self.family_table.setHorizontalHeaderLabels(["Роль", "Имя", "Возраст/Этап", "Статус"])
@@ -176,38 +191,72 @@ class NPCCardDialog(QDialog):
         self._populate_family()
 
     def _populate_family(self):
-        if not self.sim or not getattr(self.sim, 'family_manager', None):
-            return
-
-        fm = self.sim.family_manager
+        if not self.sim: return
         current_date = self.sim.time.current_datetime
+        from living_world.engine.life_cycle_manager import LifeCycleManager
 
-        parents = fm.get_parents(self.npc.id)
-        children = fm.get_children(self.npc.id)
-        siblings = fm.get_siblings(self.npc.id)
+        # Populate Household
+        if getattr(self.sim, 'household_manager', None) and getattr(self.npc, 'household_id', None):
+            hm = self.sim.household_manager
+            hh_id = self.npc.household_id
 
-        rows = []
+            home_b = self.city.get_building(self.npc.home_id) if self.city else None
+            home_name = home_b.name if home_b else "Неизвестно"
 
-        for p in parents:
-            role = "Мать" if p.gender == 'Ж' else "Отец"
-            rows.append((role, p))
+            total_wealth = hm.get_total_wealth(hh_id)
+            hh_text = f"<b>Домохозяйство:</b> Проживает в {home_name} <br><b>Общие ресурсы (сумма денег):</b> {total_wealth:.2f} ₽"
+            self.household_info.setText(hh_text)
 
-        for c in children:
-            rows.append(("Сын" if c.gender == 'М' else "Дочь", c))
+            adults = hm.get_adults(hh_id)
+            children = hm.get_children(hh_id)
 
-        for s in siblings:
-            rows.append(("Брат" if s.gender == 'М' else "Сестра", s))
+            # Все остальные, кто не попал в adults и children, но жив (например TEEN)
+            members = hm.get_household_members(hh_id)
+            others = [m for m in members if m not in adults and m not in children and m.is_alive]
 
-        self.family_table.setRowCount(len(rows))
-        for row, (role, rel_npc) in enumerate(rows):
-            from living_world.engine.life_cycle_manager import LifeCycleManager
-            age = rel_npc.get_age(current_date)
-            stage_str = LifeCycleManager.format_life_stage_ru(rel_npc.get_life_stage(current_date))
+            hh_rows = []
+            for a in adults: hh_rows.append(("Взрослый", a))
+            for c in children: hh_rows.append(("Иждивенец", c))
+            for o in others: hh_rows.append(("Член домохозяйства", o))
 
-            self.family_table.setItem(row, 0, QTableWidgetItem(role))
-            self.family_table.setItem(row, 1, QTableWidgetItem(rel_npc.get_full_name()))
-            self.family_table.setItem(row, 2, QTableWidgetItem(f"{age} ({stage_str})"))
-            self.family_table.setItem(row, 3, QTableWidgetItem("Жив" if rel_npc.is_alive else "Умер"))
+            # Добавим и умерших, которые числились в этом домохозяйстве (для истории)
+            dead_members = [m for m in members if not m.is_alive]
+            for d in dead_members: hh_rows.append(("В архиве", d))
+
+            self.household_table.setRowCount(len(hh_rows))
+            for row, (role, rel_npc) in enumerate(hh_rows):
+                age = rel_npc.get_age(current_date)
+                stage_str = LifeCycleManager.format_life_stage_ru(rel_npc.get_life_stage(current_date))
+
+                self.household_table.setItem(row, 0, QTableWidgetItem(role))
+                self.household_table.setItem(row, 1, QTableWidgetItem(rel_npc.get_full_name()))
+                self.household_table.setItem(row, 2, QTableWidgetItem(f"{age} ({stage_str})"))
+                self.household_table.setItem(row, 3, QTableWidgetItem("Жив" if rel_npc.is_alive else "Умер"))
+        else:
+            self.household_info.setText("Нет данных о домохозяйстве.")
+            self.household_table.setRowCount(0)
+
+        # Populate Family (Biological)
+        if getattr(self.sim, 'family_manager', None):
+            fm = self.sim.family_manager
+            parents = fm.get_parents(self.npc.id)
+            children = fm.get_children(self.npc.id)
+            siblings = fm.get_siblings(self.npc.id)
+
+            rows = []
+            for p in parents: rows.append(("Мать" if p.gender == 'Ж' else "Отец", p))
+            for c in children: rows.append(("Сын" if c.gender == 'М' else "Дочь", c))
+            for s in siblings: rows.append(("Брат" if s.gender == 'М' else "Сестра", s))
+
+            self.family_table.setRowCount(len(rows))
+            for row, (role, rel_npc) in enumerate(rows):
+                age = rel_npc.get_age(current_date)
+                stage_str = LifeCycleManager.format_life_stage_ru(rel_npc.get_life_stage(current_date))
+
+                self.family_table.setItem(row, 0, QTableWidgetItem(role))
+                self.family_table.setItem(row, 1, QTableWidgetItem(rel_npc.get_full_name()))
+                self.family_table.setItem(row, 2, QTableWidgetItem(f"{age} ({stage_str})"))
+                self.family_table.setItem(row, 3, QTableWidgetItem("Жив" if rel_npc.is_alive else "Умер"))
 
     def _populate_relationships(self):
         if not self.sim: return

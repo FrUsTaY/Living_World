@@ -114,6 +114,12 @@ CREATE TABLE IF NOT EXISTS education_history (
     status TEXT,
     qualification TEXT
 );
+
+CREATE TABLE IF NOT EXISTS households (
+    id TEXT PRIMARY KEY,
+    home_id TEXT,
+    creation_time TEXT
+);
 """
 
 class Database:
@@ -146,6 +152,9 @@ class Database:
             if 'current_education_id' not in columns:
                  cursor.execute("ALTER TABLE npcs ADD COLUMN current_education_id TEXT DEFAULT NULL")
                  cursor.execute("ALTER TABLE npcs ADD COLUMN education_status TEXT DEFAULT NULL")
+
+            if 'household_id' not in columns:
+                 cursor.execute("ALTER TABLE npcs ADD COLUMN household_id TEXT DEFAULT NULL")
 
             # Fetch sim_time from meta to calculate date_of_birth for existing NPCs
             if 'date_of_birth' not in columns:
@@ -220,7 +229,22 @@ class Database:
             if 'valence' not in columns_mem:
                 cursor.execute("ALTER TABLE memories ADD COLUMN valence REAL DEFAULT 0.0")
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None):
+            # Migration: Create households for existing NPCs if they don't have household_id
+            cursor.execute("SELECT id, home_id FROM npcs WHERE household_id IS NULL AND home_id IS NOT NULL")
+            npcs_without_household = cursor.fetchall()
+            if npcs_without_household:
+                home_households = {}
+                import uuid
+                current_time = datetime.now().isoformat()
+                for npc_id, home_id in npcs_without_household:
+                    if home_id not in home_households:
+                        hh_id = str(uuid.uuid4())
+                        home_households[home_id] = hh_id
+                        cursor.execute("INSERT INTO households (id, home_id, creation_time) VALUES (?, ?, ?)", (hh_id, home_id, current_time))
+                    hh_id = home_households[home_id]
+                    cursor.execute("UPDATE npcs SET household_id = ? WHERE id = ?", (hh_id, npc_id))
+
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -228,6 +252,7 @@ class Database:
         if education_programs is None: education_programs = []
         if education_history is None: education_history = []
         if pregnancies is None: pregnancies = []
+        if households is None: households = []
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -263,6 +288,20 @@ class Database:
                          (hist.npc_id, hist.institution_id, hist.program_id, hist.start_date, hist.end_date, hist.status, getattr(hist, 'qualification', None))
                      )
 
+            # Сохраняем домохозяйства
+            cursor.execute("DELETE FROM households")
+            for h in households:
+                if isinstance(h, dict):
+                    cursor.execute(
+                        "INSERT INTO households (id, home_id, creation_time) VALUES (?, ?, ?)",
+                        (h['id'], h['home_id'], h['creation_time'])
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO households (id, home_id, creation_time) VALUES (?, ?, ?)",
+                        (h.id, h.home_id, h.creation_time)
+                    )
+
             # Сохраняем здания
             cursor.execute("DELETE FROM buildings")
             for b in buildings:
@@ -278,8 +317,8 @@ class Database:
                     """INSERT INTO npcs
                     (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
                     trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, family_id,
-                    date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -296,7 +335,8 @@ class Database:
                      getattr(npc, 'education_status', None),
                      getattr(npc, 'mother_id', None),
                      getattr(npc, 'father_id', None),
-                     getattr(npc, 'children_desire', 0.5))
+                     getattr(npc, 'children_desire', 0.5),
+                     getattr(npc, 'household_id', None))
                 )
 
             # Сохраняем семьи
@@ -384,4 +424,7 @@ class Database:
             cursor.execute("SELECT * FROM pregnancies")
             pregnancies = [dict(r) for r in cursor.fetchall()]
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies
+            cursor.execute("SELECT * FROM households")
+            households = [dict(r) for r in cursor.fetchall()]
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households
