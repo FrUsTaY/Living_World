@@ -68,6 +68,9 @@ class WorkAction(Action):
         return "Работает"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
         return npc.work_id is not None
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:

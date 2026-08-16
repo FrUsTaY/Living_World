@@ -18,6 +18,8 @@ class SocialManager:
         location_groups = {}
         for npc in self.simulation.npcs:
             if not getattr(npc, 'is_alive', True): continue
+            from living_world.engine.life_cycle_manager import LifeStage
+            if npc.get_life_stage(self.simulation.time.current_datetime) == LifeStage.BABY: continue
             loc = npc.current_location
             if not loc: continue
             if loc not in location_groups: location_groups[loc] = []

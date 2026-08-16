@@ -5,7 +5,7 @@ from living_world.engine.event_bus import bus
 from living_world.engine.life_cycle_manager import LifeCycleManager, LifeStage
 
 class NPC:
-    def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id, npc_id=None, traits=None, family_id=None):
+    def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id, npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -32,6 +32,9 @@ class NPC:
 
         self.traits = traits or self._generate_traits()
         self.family_id = family_id
+        self.mother_id = mother_id
+        self.father_id = father_id
+        self.children_desire = children_desire if children_desire is not None else random.uniform(0.0, 1.0)
 
         self.current_education_id = None
         self.education_status = None

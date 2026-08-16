@@ -33,12 +33,29 @@ class NPCCardDialog(QDialog):
         self.form = QFormLayout()
         self.labels = {}
 
+
+
         current_date = self.sim.time.current_datetime if self.sim else None
         data = self.npc.to_dict(self.city, current_world_date=current_date)
+
+        if self.sim:
+            mother = next((n for n in self.sim.npcs if n.id == self.npc.mother_id), None) if getattr(self.npc, 'mother_id', None) else None
+            father = next((n for n in self.sim.npcs if n.id == self.npc.father_id), None) if getattr(self.npc, 'father_id', None) else None
+            data['Мать'] = mother.get_full_name() if mother else "Неизвестна"
+            data['Отец'] = father.get_full_name() if father else "Неизвестен"
+
+            if self.npc.gender == 'Ж' and getattr(self.sim, 'reproduction_manager', None):
+                active_preg = next((p for p in self.sim.reproduction_manager.active_pregnancies if p.mother_id == self.npc.id and p.status == 'active'), None)
+                if active_preg:
+                     data['Беременность'] = 'Да'
+                     data['Ожидаемая дата родов'] = active_preg.expected_birth_date.strftime("%d.%m.%Y")
+
         for key, value in data.items():
             val_label = QLabel(str(value))
             self.labels[key] = val_label
             self.form.addRow(QLabel(f"<b>{key}:</b>"), val_label)
+
+
 
         layout.addLayout(self.form)
         self.tabs.addTab(tab, "Общая информация")
@@ -177,10 +194,25 @@ class NPCCardDialog(QDialog):
         current_date = self.sim.time.current_datetime if self.sim else None
         data = self.npc.to_dict(self.city, current_world_date=current_date)
 
-        # If dict keys change (shouldn't really happen but to be safe)
+        if self.sim:
+            mother = next((n for n in self.sim.npcs if n.id == self.npc.mother_id), None) if getattr(self.npc, 'mother_id', None) else None
+            father = next((n for n in self.sim.npcs if n.id == self.npc.father_id), None) if getattr(self.npc, 'father_id', None) else None
+            data['Мать'] = mother.get_full_name() if mother else "Неизвестна"
+            data['Отец'] = father.get_full_name() if father else "Неизвестен"
+
+            if self.npc.gender == 'Ж' and getattr(self.sim, 'reproduction_manager', None):
+                active_preg = next((p for p in self.sim.reproduction_manager.active_pregnancies if p.mother_id == self.npc.id and p.status == 'active'), None)
+                if active_preg:
+                     data['Беременность'] = 'Да'
+                     data['Ожидаемая дата родов'] = active_preg.expected_birth_date.strftime("%d.%m.%Y")
+
         for key, value in data.items():
             if key in self.labels:
                 self.labels[key].setText(str(value))
+            else:
+                val_label = QLabel(str(value))
+                self.labels[key] = val_label
+                self.form.addRow(QLabel(f"<b>{key}:</b>"), val_label)
 
         # To avoid UI flickering, we only fully re-populate if tab is visible,
         # but for simplicity let's just re-populate

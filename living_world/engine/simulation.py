@@ -8,6 +8,7 @@ from living_world.engine.social.social_manager import SocialManager
 from living_world.engine.social.family_manager import FamilyManager
 from living_world.engine.ai.ai_controller import AIController
 from living_world.engine.education.manager import EducationManager
+from living_world.engine.reproduction.manager import ReproductionManager
 
 class Simulation:
     def __init__(self):
@@ -27,6 +28,7 @@ class Simulation:
 
         self.ai_controller = AIController(self)
         self.education_manager = EducationManager(self)
+        self.reproduction_manager = ReproductionManager(self)
 
         bus.subscribe("log_event", self._on_log_event)
 
@@ -76,6 +78,9 @@ class Simulation:
                             npc.date_of_death = current_date
                             npc.state = "Умер"
                             bus.publish("log_event", f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.")
+
+            if is_new_day:
+                self.reproduction_manager.update()
 
             for npc in self.npcs:
                 if is_new_day:

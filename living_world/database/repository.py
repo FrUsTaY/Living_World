@@ -182,6 +182,30 @@ class Database:
                         dob = current_date - timedelta(days=int(age) * 365)
                         cursor.execute("UPDATE npcs SET date_of_birth = ?, is_alive = 1 WHERE id = ?", (dob.isoformat(), npc_id))
 
+
+            cursor.execute('''CREATE TABLE IF NOT EXISTS pregnancies (
+                id TEXT PRIMARY KEY,
+                mother_id TEXT,
+                father_id TEXT,
+                start_date TEXT,
+                expected_birth_date TEXT,
+                status TEXT
+            )''')
+
+            cursor.execute("PRAGMA table_info(npcs)")
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'mother_id' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN mother_id TEXT")
+            if 'father_id' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN father_id TEXT")
+            if 'children_desire' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN children_desire REAL DEFAULT 0.5")
+
+            cursor.execute("PRAGMA table_info(families)")
+            columns_fam = [info[1] for info in cursor.fetchall()]
+            if 'last_reproduction_check' not in columns_fam:
+                cursor.execute("ALTER TABLE families ADD COLUMN last_reproduction_check TEXT")
+
             cursor.execute("PRAGMA table_info(relationships)")
             columns_rel = [info[1] for info in cursor.fetchall()]
             if 'last_interaction_time' not in columns_rel:
@@ -196,13 +220,14 @@ class Database:
             if 'valence' not in columns_mem:
                 cursor.execute("ALTER TABLE memories ADD COLUMN valence REAL DEFAULT 0.0")
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
         if educational_institutions is None: educational_institutions = []
         if education_programs is None: education_programs = []
         if education_history is None: education_history = []
+        if pregnancies is None: pregnancies = []
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -253,8 +278,8 @@ class Database:
                     """INSERT INTO npcs
                     (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
                     trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, family_id,
-                    date_of_birth, date_of_death, is_alive, current_education_id, education_status)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -268,17 +293,30 @@ class Database:
                      npc.date_of_death.isoformat() if getattr(npc, 'date_of_death', None) else None,
                      1 if getattr(npc, 'is_alive', True) else 0,
                      getattr(npc, 'current_education_id', None),
-                     getattr(npc, 'education_status', None))
+                     getattr(npc, 'education_status', None),
+                     getattr(npc, 'mother_id', None),
+                     getattr(npc, 'father_id', None),
+                     getattr(npc, 'children_desire', 0.5))
                 )
 
             # Сохраняем семьи
             cursor.execute("DELETE FROM families")
             for f in families:
                 cursor.execute(
-                    "INSERT INTO families (id, creation_time, is_active) VALUES (?, ?, ?)",
-                    (f['id'], f['creation_time'], f['is_active'])
+                    "INSERT INTO families (id, creation_time, is_active, last_reproduction_check) VALUES (?, ?, ?, ?)",
+                    (f['id'], f['creation_time'], f['is_active'], f.get('last_reproduction_check'))
                 )
 
+
+            # Сохраняем беременности
+            cursor.execute("DELETE FROM pregnancies")
+            for p in pregnancies:
+                cursor.execute(
+                    "INSERT INTO pregnancies (id, mother_id, father_id, start_date, expected_birth_date, status) VALUES (?, ?, ?, ?, ?, ?)",
+                    (p.id, p.mother_id, p.father_id, p.start_date.isoformat(), p.expected_birth_date.isoformat(), p.status)
+                )
+
+            # Сохраняем отношения
             # Сохраняем отношения (полная перезапись на сохранении)
             cursor.execute("DELETE FROM relationships")
             for r in relationships:
@@ -343,4 +381,7 @@ class Database:
             cursor.execute("SELECT * FROM memories ORDER BY id ASC")
             memories = [dict(r) for r in cursor.fetchall()]
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history
+            cursor.execute("SELECT * FROM pregnancies")
+            pregnancies = [dict(r) for r in cursor.fetchall()]
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies

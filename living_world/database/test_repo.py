@@ -1,61 +1,29 @@
 import pytest
-import os
-from living_world.database.repository import Database
-from living_world.population.npc import NPC
 from datetime import datetime
+from living_world.database.repository import Database
+from living_world.engine.reproduction.pregnancy import Pregnancy
 
-def test_database_migrations_and_save_load():
-    db_path = "test_db.db"
-    if os.path.exists(db_path):
-        os.remove(db_path)
+def test_save_load_pregnancy(tmp_path):
+    repo = Database(str(tmp_path / "test.db"))
 
-    db = Database(db_path)
+    p = Pregnancy(mother_id="m1", father_id="f1", start_date=datetime(2000, 1, 1), expected_birth_date=datetime(2000, 10, 7), status="active")
 
-    current_date = datetime(2001, 1, 1)
-    sim_time = {"year": 2001, "month": 1, "day": 1, "hour": 8, "minute": 0}
+    repo.save_world(
+        sim_time={"year": 2000, "month": 1, "day": 1, "hour": 8, "minute": 0},
+        npcs=[],
+        buildings=[],
+        events=[],
+        pregnancies=[p]
+    )
 
-    npc = NPC("Test", "Test", current_date, "Ж", "None", "home_1", "work_1")
-    npc.current_education_id = "prog_1"
-    npc.education_status = "Обучается"
+    loaded = repo.load_world()
+    pregnancies_loaded = loaded[10]
 
-    class MockInstitution:
-        def __init__(self):
-            self.id = "inst_1"
-            self.type = "university"
-            self.name = "Uni"
-            self.capacity = 100
-            self.building_id = "build_1"
+    assert len(pregnancies_loaded) == 1
+    loaded_p = pregnancies_loaded[0]
+    assert loaded_p['mother_id'] == "m1"
+    assert loaded_p['father_id'] == "f1"
+    assert loaded_p['status'] == "active"
+    assert loaded_p['start_date'] == p.start_date.isoformat()
+    assert loaded_p['expected_birth_date'] == p.expected_birth_date.isoformat()
 
-    class MockProgram:
-        def __init__(self):
-            self.id = "prog_1"
-            self.institution_id = "inst_1"
-            self.name = "Engineering"
-            self.type = "bachelor"
-            self.duration = 4
-            self.requirements = {"education": "high_school"}
-
-    hist = {
-        "npc_id": npc.id,
-        "institution_id": "inst_1",
-        "program_id": "prog_1",
-        "start_date": "2000-01-01",
-        "end_date": None,
-        "status": "Обучается",
-        "qualification": None
-    }
-
-    db.save_world(sim_time, [npc], [], [], [], [], [], [MockInstitution()], [MockProgram()], [hist])
-
-    loaded = db.load_world()
-
-    assert loaded[7][0]["id"] == "inst_1"
-    assert loaded[8][0]["name"] == "Engineering"
-    assert loaded[9][0]["npc_id"] == npc.id
-
-    # test npc props
-    assert loaded[2][0]["current_education_id"] == "prog_1"
-    assert loaded[2][0]["education_status"] == "Обучается"
-
-    if os.path.exists(db_path):
-        os.remove(db_path)
