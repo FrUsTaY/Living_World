@@ -6,6 +6,7 @@ from living_world.engine.social.memory_manager import MemoryManager
 from living_world.engine.social.relationship_manager import RelationshipManager
 from living_world.engine.social.social_manager import SocialManager
 from living_world.engine.social.family_manager import FamilyManager
+from living_world.engine.social.household_manager import HouseholdManager
 from living_world.engine.ai.ai_controller import AIController
 from living_world.engine.education.manager import EducationManager
 from living_world.engine.reproduction.manager import ReproductionManager
@@ -24,6 +25,7 @@ class Simulation:
         self.relationship_manager = RelationshipManager(self)
         self.social_manager = SocialManager(self)
         self.family_manager = FamilyManager(self)
+        self.household_manager = HouseholdManager(self)
         self.families = []
 
         self.ai_controller = AIController(self)

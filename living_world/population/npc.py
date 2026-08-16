@@ -34,6 +34,7 @@ class NPC:
         self.family_id = family_id
         self.mother_id = mother_id
         self.father_id = father_id
+        self.household_id = None
         self.children_desire = children_desire if children_desire is not None else random.uniform(0.0, 1.0)
 
         self.current_education_id = None
