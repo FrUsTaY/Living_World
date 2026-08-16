@@ -36,3 +36,56 @@ class FamilyManager:
                     break
 
         bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.")
+
+    def get_parents(self, npc_id):
+        npc = next((n for n in self.simulation.npcs if n.id == npc_id), None)
+        if not npc:
+            return []
+
+        parents = []
+        if getattr(npc, 'mother_id', None):
+            mother = next((n for n in self.simulation.npcs if n.id == npc.mother_id), None)
+            if mother: parents.append(mother)
+
+        if getattr(npc, 'father_id', None):
+            father = next((n for n in self.simulation.npcs if n.id == npc.father_id), None)
+            if father: parents.append(father)
+
+        return parents
+
+    def get_children(self, npc_id):
+        children = []
+        for npc in self.simulation.npcs:
+            if getattr(npc, 'mother_id', None) == npc_id or getattr(npc, 'father_id', None) == npc_id:
+                children.append(npc)
+        return children
+
+    def get_siblings(self, npc_id):
+        npc = next((n for n in self.simulation.npcs if n.id == npc_id), None)
+        if not npc:
+            return []
+
+        mother_id = getattr(npc, 'mother_id', None)
+        father_id = getattr(npc, 'father_id', None)
+
+        if not mother_id and not father_id:
+            return []
+
+        siblings = []
+        for other in self.simulation.npcs:
+            if other.id == npc_id:
+                continue
+
+            other_mother_id = getattr(other, 'mother_id', None)
+            other_father_id = getattr(other, 'father_id', None)
+
+            is_sibling = False
+            if mother_id and other_mother_id == mother_id:
+                is_sibling = True
+            elif father_id and other_father_id == father_id:
+                is_sibling = True
+
+            if is_sibling:
+                siblings.append(other)
+
+        return siblings

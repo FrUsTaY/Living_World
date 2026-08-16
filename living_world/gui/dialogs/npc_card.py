@@ -19,6 +19,7 @@ class NPCCardDialog(QDialog):
         self._init_traits_tab()
         self._init_education_tab()
         self._init_relationships_tab()
+        self._init_family_tab()
         self._init_memory_tab()
 
         layout.addWidget(self.tabs)
@@ -160,6 +161,54 @@ class NPCCardDialog(QDialog):
         self.tabs.addTab(self.mem_tab, "Память")
         self._populate_memories()
 
+    def _init_family_tab(self):
+        self.family_tab = QWidget()
+        layout = QVBoxLayout(self.family_tab)
+
+        self.family_table = QTableWidget()
+        self.family_table.setColumnCount(4)
+        self.family_table.setHorizontalHeaderLabels(["Роль", "Имя", "Возраст/Этап", "Статус"])
+        self.family_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.family_table.setEditTriggers(QTableWidget.NoEditTriggers)
+
+        layout.addWidget(self.family_table)
+        self.tabs.addTab(self.family_tab, "Семья")
+        self._populate_family()
+
+    def _populate_family(self):
+        if not self.sim or not getattr(self.sim, 'family_manager', None):
+            return
+
+        fm = self.sim.family_manager
+        current_date = self.sim.time.current_datetime
+
+        parents = fm.get_parents(self.npc.id)
+        children = fm.get_children(self.npc.id)
+        siblings = fm.get_siblings(self.npc.id)
+
+        rows = []
+
+        for p in parents:
+            role = "Мать" if p.gender == 'Ж' else "Отец"
+            rows.append((role, p))
+
+        for c in children:
+            rows.append(("Сын" if c.gender == 'М' else "Дочь", c))
+
+        for s in siblings:
+            rows.append(("Брат" if s.gender == 'М' else "Сестра", s))
+
+        self.family_table.setRowCount(len(rows))
+        for row, (role, rel_npc) in enumerate(rows):
+            from living_world.engine.life_cycle_manager import LifeCycleManager
+            age = rel_npc.get_age(current_date)
+            stage_str = LifeCycleManager.format_life_stage_ru(rel_npc.get_life_stage(current_date))
+
+            self.family_table.setItem(row, 0, QTableWidgetItem(role))
+            self.family_table.setItem(row, 1, QTableWidgetItem(rel_npc.get_full_name()))
+            self.family_table.setItem(row, 2, QTableWidgetItem(f"{age} ({stage_str})"))
+            self.family_table.setItem(row, 3, QTableWidgetItem("Жив" if rel_npc.is_alive else "Умер"))
+
     def _populate_relationships(self):
         if not self.sim: return
         rels = self.sim.relationship_manager.get_all_relationships_for(self.npc.id)
@@ -221,4 +270,6 @@ class NPCCardDialog(QDialog):
         elif self.tabs.currentIndex() == 3:
             self._populate_relationships()
         elif self.tabs.currentIndex() == 4:
+            self._populate_family()
+        elif self.tabs.currentIndex() == 5:
             self._populate_memories()

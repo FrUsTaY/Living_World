@@ -83,6 +83,9 @@ class Simulation:
                 self.reproduction_manager.update()
 
             for npc in self.npcs:
+                if not npc.is_alive:
+                    continue
+
                 if is_new_day:
                     self.education_manager.update_npc_education(npc, time_dict)
                 # 1. Изменение базовых потребностей

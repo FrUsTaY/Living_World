@@ -2,6 +2,7 @@ from typing import List, Dict, Type
 import random
 from living_world.engine.ai.action import Action
 from living_world.engine.ai.basic_actions import SleepAction, EatAction, WorkAction, RelaxAction, PlayAction, SocializeAction, StudyAction
+from living_world.engine.ai.family_actions import CareForChildAction
 
 class AIController:
     def __init__(self, simulation):
@@ -13,7 +14,8 @@ class AIController:
             RelaxAction(),
             PlayAction(),
             SocializeAction(),
-            StudyAction()
+            StudyAction(),
+            CareForChildAction()
         ]
 
     def choose_and_execute_action(self, npc, time_dict):
