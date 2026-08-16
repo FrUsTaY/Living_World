@@ -7,6 +7,8 @@ class SleepAction(Action):
         return "Спит"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
+        # Младенцы могут спать сами (это естественный процесс, не требующий явного действия родителя,
+        # хотя родитель может укладывать спать в будущем. Пока оставим True)
         return True
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
@@ -42,6 +44,9 @@ class EatAction(Action):
         return "Ест"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
         return True
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
@@ -105,6 +110,9 @@ class RelaxAction(Action):
         return "Отдыхает"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
         return True
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
@@ -155,6 +163,9 @@ class SocializeAction(Action):
         return "Общается"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
         return True
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:

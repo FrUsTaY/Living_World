@@ -114,7 +114,8 @@ class SocialManager:
 
         flirt_score = (rel['romantic_interest'] * 0.8) + (npc_a.traits.get('boldness', 0) * 20) + (rel['affinity'] * 0.2)
         flirt_score += context_score * 5.0
-        if flirt_score > 0 and npc_a.age >= 18 and npc_b.age >= 18 and rel['romantic_interest'] > 15:
+        current_date = self.simulation.time.current_datetime
+        if flirt_score > 0 and npc_a.get_age(current_date) >= 18 and npc_b.get_age(current_date) >= 18 and rel['romantic_interest'] > 15:
             scores['flirt'] = flirt_score
 
         # Divorce Check (replaces Propose as the only family-related check, Propose remains)
@@ -123,7 +124,7 @@ class SocialManager:
                 divorce_score = 5 + (npc_a.traits.get('boldness', 0) * 20) + (20 - rel['romantic_interest']) + (30 - rel['affinity']) - (context_score * 10)
                 if divorce_score > 0: scores['divorce'] = divorce_score
 
-        elif rel['romantic_interest'] > 70 and rel['trust'] > 60 and npc_a.family_id is None and npc_b.family_id is None and npc_a.age >= 18 and npc_b.age >= 18:
+        elif rel['romantic_interest'] > 70 and rel['trust'] > 60 and npc_a.family_id is None and npc_b.family_id is None and npc_a.get_age(current_date) >= 18 and npc_b.get_age(current_date) >= 18:
             inclination_a = (npc_a.traits.get('friendliness', 0) + npc_a.traits.get('empathy', 0) + npc_a.traits.get('sociability', 0) - npc_a.traits.get('boldness', 0) * 0.5) / 3.0
             propose_score = 5 + (npc_a.traits.get('boldness', 0) * 20) + (rel['romantic_interest'] - 70) + (rel['trust'] - 60) + (context_score * 10) + (inclination_a * 20)
             if propose_score > 0: scores['propose'] = propose_score

@@ -12,7 +12,7 @@ class ReproductionManager:
         self.simulation = simulation
         self.active_pregnancies = []
 
-    def get_children(self, mother_id, father_id):
+    def get_children_count(self, mother_id, father_id):
         children_count = 0
         for npc in self.simulation.npcs:
             if npc.mother_id == mother_id or npc.father_id == father_id:
@@ -58,7 +58,7 @@ class ReproductionManager:
 
         desire = (getattr(mother, 'children_desire', 0.5) + getattr(father, 'children_desire', 0.5)) / 2.0
 
-        children_count = self.get_children(mother.id, father.id)
+        children_count = self.get_children_count(mother.id, father.id)
         children_modifier = max(0.01, 1.0 - (children_count * 0.3))
 
         rel_m_f = self.simulation.relationship_manager.get_relationship(mother.id, father.id)
