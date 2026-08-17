@@ -257,6 +257,15 @@ class SocialManager:
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(1.0, rel_a_b['affinity'], rel_a_b))
 
             if is_household_conflict:
+                from living_world.engine.observer.world_event import EventType, EventImportance
+                if hasattr(self.simulation, 'event_aggregator'):
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.CONFLICT_MAJOR,
+                        importance=EventImportance.HIGH,
+                        message=f"{event_title} между {npc_a.first_name} и {npc_b.first_name}.",
+                        participants=[npc_a.id, npc_b.id, household_id],
+                        data={"conflict_type": event_title}
+                    )
                 bus.publish("family_conflict", {"household_id": household_id, "npc_a": npc_a, "npc_b": npc_b})
 
         elif action_name == 'flirt':
@@ -309,15 +318,32 @@ class SocialManager:
         if npc_a.get_age(current_date) < 18 or npc_b.get_age(current_date) < 18: return
         base_chance = 0.25 if is_deep_talk else 0.05
 
+        spark_happened = False
+
         if success_b > 5:
             chance_b = base_chance * max(0.1, comp)
             if random.random() < chance_b:
                 self.simulation.relationship_manager.modify_relationship(npc_b.id, npc_a.id, 'romantic_interest', random.uniform(15.0, 25.0))
+                spark_happened = True
 
         if success_a > 5:
             chance_a = base_chance * max(0.1, comp)
             if random.random() < chance_a:
                 self.simulation.relationship_manager.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', random.uniform(15.0, 25.0))
+                spark_happened = True
+
+        if spark_happened:
+            from living_world.engine.observer.world_event import EventType, EventImportance
+            if hasattr(self.simulation, 'event_aggregator'):
+                # Avoid spamming this event if they already have high interest, but for simplicity let's just log it if it happens
+                # Usually check_spark pushes it from 0 to 20
+                if self.simulation.relationship_manager.get_relationship(npc_a.id, npc_b.id)['romantic_interest'] < 30:
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.ROMANCE_START,
+                        importance=EventImportance.HIGH,
+                        message=f"Между {npc_a.first_name} и {npc_b.first_name} проскочила искра.",
+                        participants=[npc_a.id, npc_b.id]
+                    )
 
     def _handle_greeting(self, npc_a, npc_b, time_dict):
         rel_mgr = self.simulation.relationship_manager
@@ -333,5 +359,15 @@ class SocialManager:
         rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', aff_a)
         rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', aff_b)
 
-        self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Знакомство", f"Познакомился с {npc_b.first_name}", 0.3, 0.1)
+        mem_a = self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Знакомство", f"Познакомился с {npc_b.first_name}", 0.3, 0.1)
         self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Знакомство", f"Познакомился с {npc_a.first_name}", 0.3, 0.1)
+
+        if mem_a:
+            from living_world.engine.observer.world_event import EventType, EventImportance
+            if hasattr(self.simulation, 'event_aggregator'):
+                self.simulation.event_aggregator.publish_event(
+                    event_type=EventType.SOCIAL_INTERACTION,
+                    importance=EventImportance.MEDIUM,
+                    message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} познакомились.",
+                    participants=[npc_a.id, npc_b.id]
+                )

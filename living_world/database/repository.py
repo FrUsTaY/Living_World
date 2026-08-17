@@ -52,6 +52,16 @@ CREATE TABLE IF NOT EXISTS events (
     message TEXT
 );
 
+CREATE TABLE IF NOT EXISTS world_events (
+    id TEXT PRIMARY KEY,
+    timestamp TEXT,
+    type TEXT,
+    importance TEXT,
+    message TEXT,
+    participants TEXT,
+    data TEXT
+);
+
 CREATE TABLE IF NOT EXISTS relationships (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     source_npc_id TEXT,
@@ -244,7 +254,7 @@ class Database:
                     hh_id = home_households[home_id]
                     cursor.execute("UPDATE npcs SET household_id = ? WHERE id = ?", (hh_id, npc_id))
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -253,6 +263,7 @@ class Database:
         if education_history is None: education_history = []
         if pregnancies is None: pregnancies = []
         if households is None: households = []
+        if world_events is None: world_events = []
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -384,6 +395,14 @@ class Database:
                     (datetime.now().isoformat(), event['time'], event['msg'])
                 )
 
+            # Сохраняем world_events (новые структурированные события)
+            cursor.execute("DELETE FROM world_events")
+            for we in world_events:
+                cursor.execute(
+                    "INSERT INTO world_events (id, timestamp, type, importance, message, participants, data) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (we['id'], we['timestamp'], we['type'], we['importance'], we['message'], json.dumps(we['participants']), json.dumps(we['data']))
+                )
+
     def load_world(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -427,4 +446,17 @@ class Database:
             cursor.execute("SELECT * FROM households")
             households = [dict(r) for r in cursor.fetchall()]
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households
+            # Handle backward compatibility: older save files may not have world_events table
+            world_events = []
+            try:
+                cursor.execute("SELECT * FROM world_events")
+                world_events_raw = [dict(r) for r in cursor.fetchall()]
+                for we in world_events_raw:
+                    we_dict = dict(we)
+                    we_dict['participants'] = json.loads(we_dict['participants']) if we_dict['participants'] else []
+                    we_dict['data'] = json.loads(we_dict['data']) if we_dict['data'] else {}
+                    world_events.append(we_dict)
+            except sqlite3.OperationalError:
+                pass
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events

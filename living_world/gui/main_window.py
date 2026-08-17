@@ -7,6 +7,7 @@ from living_world.engine.simulation import Simulation
 from living_world.population.generation import generate_initial_world
 from living_world.gui.tabs.population_tab import PopulationTab
 from living_world.gui.tabs.families_tab import FamiliesTab
+from living_world.gui.tabs.world_tab import WorldTab
 from living_world.gui.dialogs.npc_card import NPCCardDialog
 from living_world.gui.dialogs.load_world import LoadWorldDialog
 from living_world.database.repository import Database
@@ -71,21 +72,20 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
 
-        self.map_tab = QWidget()
-        self.map_layout = QVBoxLayout(self.map_tab)
-        self.map_layout.addWidget(QLabel("Карта города (в разработке)"))
+        self.world_tab = WorldTab(self.sim, self)
 
         self.pop_tab = PopulationTab(self.sim, self)
 
-        self.tabs.addTab(self.map_tab, "Мир")
+        self.tabs.addTab(self.world_tab, "Мир")
         self.tabs.addTab(self.pop_tab, "Жители")
         self.fam_tab = FamiliesTab(self.sim, self)
         self.tabs.addTab(self.fam_tab, "Семьи")
 
         main_layout.addWidget(self.tabs, stretch=3)
 
-        main_layout.addWidget(QLabel("Журнал событий:"))
+        main_layout.addWidget(QLabel("Журнал событий (технический лог):"))
         self.log_list = QListWidget()
+        # Для UI сделаем лог поменьше, чтобы акцент был на вкладку "Мир"
         main_layout.addWidget(self.log_list, stretch=1)
 
     def toggle_pause(self):
@@ -119,7 +119,9 @@ class MainWindow(QMainWindow):
 
             self.lbl_time.setText(self.sim.time.format_time())
 
-            if self.tabs.currentIndex() == 1:
+            if self.tabs.currentIndex() == 0:
+                self.world_tab.update_data()
+            elif self.tabs.currentIndex() == 1:
                 self.pop_tab.update_data()
             elif self.tabs.currentIndex() == 2:
                 self.fam_tab.update_data()
@@ -139,9 +141,11 @@ class MainWindow(QMainWindow):
 
     def new_world(self):
         self.sim = Simulation()
+        self.world_tab.simulation = self.sim
         self.pop_tab.simulation = self.sim
         self.fam_tab.simulation = self.sim
         generate_initial_world(self.sim.city, self.sim, 25)
+        self.world_tab.update_data()
         self.pop_tab.update_data()
         self.update_log()
         self.lbl_time.setText(self.sim.time.format_time())
@@ -167,7 +171,8 @@ class MainWindow(QMainWindow):
                     list(edu_inst.programs.values()) if edu_inst else [],
                     [r.to_dict() for r in getattr(edu_inst, 'history', [])] if edu_inst else [],
                     getattr(self.sim, 'reproduction_manager', None).active_pregnancies if hasattr(self.sim, 'reproduction_manager') else [],
-                    households_to_save
+                    households_to_save,
+                    self.sim.event_journal.to_dicts()
                 )
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
@@ -178,7 +183,14 @@ class MainWindow(QMainWindow):
         if dialog.exec() == QDialog.Accepted and dialog.selected_file:
             db = Database(dialog.selected_file)
             try:
-                time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts = db.load_world()
+                load_res = db.load_world()
+                if len(load_res) == 13:
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts = load_res
+                else:
+                    # Обратная совместимость
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts = load_res
+                    world_events_dicts = []
+
                 if not time_dict:
                     QMessageBox.warning(self, "Загрузка", "В файле нет сохраненного мира.")
                     return
@@ -271,11 +283,14 @@ class MainWindow(QMainWindow):
                 self.sim.relationship_manager.load_relationships(relationships)
                 self.sim.memory_manager.load_memories(memories)
                 self.sim.families = families
+                self.sim.event_journal.load_from_dicts(world_events_dicts)
 
+                self.world_tab.simulation = self.sim
                 self.pop_tab.simulation = self.sim
                 self.fam_tab.simulation = self.sim
 
                 self.lbl_time.setText(self.sim.time.format_time())
+                self.world_tab.update_data()
                 self.pop_tab.update_data()
                 self.update_log()
 

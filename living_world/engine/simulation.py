@@ -10,6 +10,9 @@ from living_world.engine.social.household_manager import HouseholdManager
 from living_world.engine.ai.ai_controller import AIController
 from living_world.engine.education.manager import EducationManager
 from living_world.engine.reproduction.manager import ReproductionManager
+from living_world.engine.observer.event_journal import EventJournal
+from living_world.engine.observer.event_aggregator import EventAggregator
+from living_world.engine.observer.world_event import EventType, EventImportance
 
 class Simulation:
     def __init__(self):
@@ -31,6 +34,10 @@ class Simulation:
         self.ai_controller = AIController(self)
         self.education_manager = EducationManager(self)
         self.reproduction_manager = ReproductionManager(self)
+
+        # Observer 3.5.1
+        self.event_journal = EventJournal()
+        self.event_aggregator = EventAggregator(self.event_journal, self)
 
         bus.subscribe("log_event", self._on_log_event)
 
@@ -64,6 +71,9 @@ class Simulation:
              # чтобы UI контролировал частоту вызовов update.
 
         # Будем считать, что при вызове update() проходит 1 минута игрового времени
+        # Важно: tick() возвращает True только если изменилась МИНУТА,
+        # а если speed слишком медленный, он может возвращать False.
+        # Для наших диагностических скриптов time_dict нужен всегда.
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
 
@@ -79,7 +89,13 @@ class Simulation:
                             npc.is_alive = False
                             npc.date_of_death = current_date
                             npc.state = "Умер"
-                            bus.publish("log_event", f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.")
+
+                            self.event_aggregator.publish_event(
+                                event_type=EventType.DEATH,
+                                importance=EventImportance.CRITICAL,
+                                message=f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.",
+                                participants=[npc.id]
+                            )
                             bus.publish("npc_died", {"npc": npc})
 
                 for household in self.household_manager.households.values():
@@ -106,7 +122,13 @@ class Simulation:
                 self.ai_controller.choose_and_execute_action(npc, time_dict)
 
                 # Логируем смену состояния
-                if npc.state != getattr(npc, '_last_state', None):
-                    bus.publish("log_event", f"{npc.get_full_name()} переходит в состояние: {npc.state}")
+                if npc.state != getattr(npc, '_last_state', None) and getattr(npc, '_last_state', None) is not None:
+                    self.event_aggregator.publish_event(
+                        event_type=EventType.STATE_CHANGE,
+                        importance=EventImportance.LOW,
+                        message=f"{npc.get_full_name()} переходит в состояние: {npc.state}",
+                        participants=[npc.id],
+                        data={"old_state": getattr(npc, '_last_state', None), "new_state": npc.state}
+                    )
                 npc._last_state = npc.state
             self.social_manager.process_social_ticks()
