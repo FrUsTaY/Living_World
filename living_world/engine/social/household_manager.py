@@ -1,10 +1,33 @@
 from living_world.engine.social.household import Household
 from living_world.engine.life_cycle_manager import LifeStage
+from living_world.engine.event_bus import bus
 
 class HouseholdManager:
+    STRESS_DEATH_IMPACT = 50.0
+    STRESS_CONFLICT_IMPACT = 10.0
+    STRESS_DAILY_DECAY = 5.0
+
     def __init__(self, simulation):
         self.simulation = simulation
         self.households = {}
+
+        bus.subscribe("npc_died", self._on_npc_died)
+        bus.subscribe("family_conflict", self._on_family_conflict)
+
+    def _on_npc_died(self, data):
+        npc = data.get("npc")
+        if npc and getattr(npc, 'household_id', None):
+            self.modify_stress(npc.household_id, self.STRESS_DEATH_IMPACT)
+
+    def _on_family_conflict(self, data):
+        household_id = data.get("household_id")
+        if household_id:
+            self.modify_stress(household_id, self.STRESS_CONFLICT_IMPACT)
+
+    def modify_stress(self, household_id: str, delta: float):
+        household = self.get_household(household_id)
+        if household:
+            household.stress = max(0.0, min(100.0, household.stress + delta))
 
     def add_household(self, household: Household):
         self.households[household.id] = household

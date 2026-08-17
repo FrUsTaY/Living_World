@@ -5,6 +5,45 @@ from living_world.engine.event_bus import bus
 class FamilyManager:
     def __init__(self, simulation):
         self.simulation = simulation
+        bus.subscribe("npc_died", self._on_npc_died)
+
+    def _on_npc_died(self, data):
+        npc = data.get("npc")
+        if not npc: return
+
+        # Find all living relatives
+        relatives = set()
+
+        # 1. Parents
+        for parent in self.get_parents(npc.id):
+            if parent.is_alive:
+                relatives.add(parent)
+
+        # 2. Children
+        for child in self.get_children(npc.id):
+            if child.is_alive:
+                relatives.add(child)
+
+        # 3. Siblings
+        for sibling in self.get_siblings(npc.id):
+            if sibling.is_alive:
+                relatives.add(sibling)
+
+        # 4. Spouse (partner in active family)
+        if npc.family_id:
+            spouses = [n for n in self.simulation.npcs if n.family_id == npc.family_id and n.id != npc.id and n.is_alive]
+            for spouse in spouses:
+                relatives.add(spouse)
+
+        for relative in relatives:
+            self.simulation.memory_manager.add_memory(
+                relative.id,
+                npc.id,
+                "Смерть близкого",
+                f"Умер(ла) {npc.first_name}",
+                significance=1.0,
+                valence=-1.0
+            )
 
     def create_family(self, npc_a, npc_b, time_dict):
         family_id = str(uuid.uuid4())

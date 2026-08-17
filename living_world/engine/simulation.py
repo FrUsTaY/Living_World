@@ -80,6 +80,11 @@ class Simulation:
                             npc.date_of_death = current_date
                             npc.state = "Умер"
                             bus.publish("log_event", f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.")
+                            bus.publish("npc_died", {"npc": npc})
+
+                for household in self.household_manager.households.values():
+                    if household.stress > 0:
+                        self.household_manager.modify_stress(household.id, -self.household_manager.STRESS_DAILY_DECAY)
 
             if is_new_day:
                 self.reproduction_manager.update()

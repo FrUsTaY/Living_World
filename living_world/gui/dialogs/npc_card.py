@@ -203,8 +203,11 @@ class NPCCardDialog(QDialog):
             home_b = self.city.get_building(self.npc.home_id) if self.city else None
             home_name = home_b.name if home_b else "Неизвестно"
 
+            household = hm.get_household(hh_id)
+            stress_text = f"{household.stress:.1f}" if household else "0.0"
+
             total_wealth = hm.get_total_wealth(hh_id)
-            hh_text = f"<b>Домохозяйство:</b> Проживает в {home_name} <br><b>Общие ресурсы (сумма денег):</b> {total_wealth:.2f} ₽"
+            hh_text = f"<b>Домохозяйство:</b> Проживает в {home_name} <br><b>Стресс домохозяйства:</b> {stress_text} <br><b>Общие ресурсы (сумма денег):</b> {total_wealth:.2f} ₽"
             self.household_info.setText(hh_text)
 
             adults = hm.get_adults(hh_id)
@@ -277,7 +280,7 @@ class NPCCardDialog(QDialog):
     def _populate_memories(self):
         if not self.sim: return
         self.mem_list.clear()
-        memories = self.sim.memory_manager.get_memories(self.npc.id)
+        memories = self.sim.memory_manager.get_memories_for(self.npc.id)
         for mem in reversed(memories[-50:]): # Show last 50
             target_str = ""
             if mem['target_npc_id']:
