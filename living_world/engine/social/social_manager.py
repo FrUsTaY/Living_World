@@ -29,6 +29,55 @@ class SocialManager:
         for loc_id, npcs_in_loc in location_groups.items():
             if len(npcs_in_loc) < 2: continue
             self._process_group(npcs_in_loc, time_dict)
+            self._check_emergent_family_conflicts(npcs_in_loc)
+
+    def _check_emergent_family_conflicts(self, npcs_in_loc):
+        for i in range(len(npcs_in_loc)):
+            for j in range(i + 1, len(npcs_in_loc)):
+                npc_a = npcs_in_loc[i]
+                npc_b = npcs_in_loc[j]
+
+                if not getattr(npc_a, 'household_id', None) or npc_a.household_id != getattr(npc_b, 'household_id', None):
+                    continue
+
+                household = self.simulation.household_manager.get_household(npc_a.household_id)
+                if not household: continue
+
+                rel_a_b = self.simulation.relationship_manager.get_relationship(npc_a.id, npc_b.id)
+
+                # Prerequisites for conflict
+                if rel_a_b['tension'] > 30 or rel_a_b['affinity'] < 20 or household.stress > 20:
+                    # Calculate probability based on tension, affinity, and stress
+                    conflict_chance = (rel_a_b['tension'] / 100.0) * 0.2 + (household.stress / 100.0) * 0.3
+                    if rel_a_b['affinity'] < 0:
+                        conflict_chance += 0.1
+
+                    # Minimal base chance if conditions are met
+                    conflict_chance = max(0.01, min(0.8, conflict_chance))
+
+                    # Random check
+                    if random.random() < conflict_chance:
+                        self._trigger_family_conflict(npc_a, npc_b, household.id)
+
+    def _trigger_family_conflict(self, npc_a, npc_b, household_id):
+        rel_mgr = self.simulation.relationship_manager
+
+        # Modify relationships: Moderate increase in tension, decrease in affinity/trust
+        rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', random.uniform(5.0, 15.0))
+        rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -random.uniform(2.0, 8.0))
+        rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -random.uniform(1.0, 5.0))
+
+        rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', random.uniform(5.0, 15.0))
+        rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -random.uniform(2.0, 8.0))
+        rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -random.uniform(1.0, 5.0))
+
+        # Create memories
+        self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Семейный конфликт", f"Ссора с {npc_b.first_name}", 0.7, -0.6)
+        self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Семейный конфликт", f"Ссора с {npc_a.first_name}", 0.7, -0.6)
+
+        # Publish event
+        bus.publish("family_conflict", {"household_id": household_id, "npc_a": npc_a, "npc_b": npc_b})
+        bus.publish("log_event", f"В доме произошел семейный конфликт между {npc_a.get_full_name()} и {npc_b.get_full_name()}.")
 
     def _process_group(self, npcs_in_loc, time_dict):
         for npc_a in npcs_in_loc:

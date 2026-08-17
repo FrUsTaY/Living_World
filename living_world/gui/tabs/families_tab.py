@@ -18,8 +18,8 @@ class FamiliesTab(QWidget):
 
         # Table
         self.table = QTableWidget()
-        self.table.setColumnCount(4)
-        self.table.setHorizontalHeaderLabels(["ID Семьи", "Дата основания", "Супруги", "Статус проживания"])
+        self.table.setColumnCount(5)
+        self.table.setHorizontalHeaderLabels(["ID Семьи", "Дата основания", "Супруги", "Статус проживания", "Стресс (Дом)"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
 
@@ -44,7 +44,15 @@ class FamiliesTab(QWidget):
                 if spouses[0].home_id == spouses[1].home_id:
                     living_status = "Вместе"
 
+
+            stress_level = "Н/Д"
+            if len(spouses) > 0 and getattr(spouses[0], 'household_id', None):
+                household = self.simulation.household_manager.get_household(spouses[0].household_id)
+                if household:
+                    stress_level = f"{household.stress:.1f}"
+
             self.table.setItem(row, 0, QTableWidgetItem(family['id'][:8] + "..."))
             self.table.setItem(row, 1, QTableWidgetItem(family['creation_time']))
             self.table.setItem(row, 2, QTableWidgetItem(spouse_names))
             self.table.setItem(row, 3, QTableWidgetItem(living_status))
+            self.table.setItem(row, 4, QTableWidgetItem(stress_level))
