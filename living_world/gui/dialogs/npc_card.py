@@ -20,6 +20,7 @@ class NPCCardDialog(QDialog):
         self._init_education_tab()
         self._init_relationships_tab()
         self._init_family_tab()
+        self._init_history_tab()
         self._init_memory_tab()
 
         layout.addWidget(self.tabs)
@@ -151,6 +152,16 @@ class NPCCardDialog(QDialog):
         self.tabs.addTab(self.rel_tab, "Отношения")
         self._populate_relationships()
 
+    def _init_history_tab(self):
+        self.history_tab = QWidget()
+        layout = QVBoxLayout(self.history_tab)
+
+        self.history_list = QListWidget()
+        layout.addWidget(self.history_list)
+
+        self.tabs.addTab(self.history_tab, "История жизни")
+        self._populate_history()
+
     def _init_memory_tab(self):
         self.mem_tab = QWidget()
         layout = QVBoxLayout(self.mem_tab)
@@ -277,6 +288,24 @@ class NPCCardDialog(QDialog):
             self.rel_table.setItem(row, 2, QTableWidgetItem(f"{rel['affinity']:.1f}"))
             self.rel_table.setItem(row, 3, QTableWidgetItem(f"{rel['trust']:.1f}"))
 
+    def _populate_history(self):
+        if not self.sim: return
+        self.history_list.clear()
+
+        from living_world.engine.observer.world_event import EventImportance
+        events = self.sim.event_journal.get_events_for_participant(self.npc.id)
+        important_events = [e for e in events if e.importance in [EventImportance.MEDIUM, EventImportance.HIGH, EventImportance.CRITICAL]]
+
+        for ev in important_events:
+            marker = ""
+            if ev.importance == EventImportance.CRITICAL:
+                marker = "🔴 "
+            elif ev.importance == EventImportance.HIGH:
+                marker = "🟡 "
+            elif ev.importance == EventImportance.MEDIUM:
+                marker = "🟢 "
+            self.history_list.addItem(f"{marker}[{ev.timestamp}] {ev.message}")
+
     def _populate_memories(self):
         if not self.sim: return
         self.mem_list.clear()
@@ -325,4 +354,6 @@ class NPCCardDialog(QDialog):
         elif self.tabs.currentIndex() == 4:
             self._populate_family()
         elif self.tabs.currentIndex() == 5:
+            self._populate_history()
+        elif self.tabs.currentIndex() == 6:
             self._populate_memories()

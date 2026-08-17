@@ -187,7 +187,9 @@ def test_db_save_load_household():
     )
 
     # Загрузка
-    sim_time, bldgs, npcs_data, events, fams, rels, mems, ed_inst, ed_prog, ed_hist, pregs, hhs_data = db.load_world()
+    load_res = db.load_world()
+    npcs_data = load_res[2]
+    hhs_data = load_res[11]
 
     assert len(hhs_data) == 1
     assert hhs_data[0]['id'] == hh.id
