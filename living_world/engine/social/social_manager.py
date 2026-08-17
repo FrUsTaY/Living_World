@@ -17,7 +17,7 @@ class SocialManager:
 
         location_groups = {}
         for npc in self.simulation.npcs:
-            if not getattr(npc, 'is_alive', True): continue
+            if not getattr(npc, 'is_available_for_social', lambda: False)(): continue
             from living_world.engine.life_cycle_manager import LifeStage
             if npc.get_life_stage(self.simulation.time.current_datetime) == LifeStage.BABY: continue
             loc = npc.current_location
@@ -29,55 +29,6 @@ class SocialManager:
         for loc_id, npcs_in_loc in location_groups.items():
             if len(npcs_in_loc) < 2: continue
             self._process_group(npcs_in_loc, time_dict)
-            self._check_emergent_family_conflicts(npcs_in_loc)
-
-    def _check_emergent_family_conflicts(self, npcs_in_loc):
-        for i in range(len(npcs_in_loc)):
-            for j in range(i + 1, len(npcs_in_loc)):
-                npc_a = npcs_in_loc[i]
-                npc_b = npcs_in_loc[j]
-
-                if not getattr(npc_a, 'household_id', None) or npc_a.household_id != getattr(npc_b, 'household_id', None):
-                    continue
-
-                household = self.simulation.household_manager.get_household(npc_a.household_id)
-                if not household: continue
-
-                rel_a_b = self.simulation.relationship_manager.get_relationship(npc_a.id, npc_b.id)
-
-                # Prerequisites for conflict
-                if rel_a_b['tension'] > 30 or rel_a_b['affinity'] < 20 or household.stress > 20:
-                    # Calculate probability based on tension, affinity, and stress
-                    conflict_chance = (rel_a_b['tension'] / 100.0) * 0.2 + (household.stress / 100.0) * 0.3
-                    if rel_a_b['affinity'] < 0:
-                        conflict_chance += 0.1
-
-                    # Minimal base chance if conditions are met
-                    conflict_chance = max(0.01, min(0.8, conflict_chance))
-
-                    # Random check
-                    if random.random() < conflict_chance:
-                        self._trigger_family_conflict(npc_a, npc_b, household.id)
-
-    def _trigger_family_conflict(self, npc_a, npc_b, household_id):
-        rel_mgr = self.simulation.relationship_manager
-
-        # Modify relationships: Moderate increase in tension, decrease in affinity/trust
-        rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', random.uniform(5.0, 15.0))
-        rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -random.uniform(2.0, 8.0))
-        rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -random.uniform(1.0, 5.0))
-
-        rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', random.uniform(5.0, 15.0))
-        rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -random.uniform(2.0, 8.0))
-        rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -random.uniform(1.0, 5.0))
-
-        # Create memories
-        self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Семейный конфликт", f"Ссора с {npc_b.first_name}", 0.7, -0.6)
-        self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Семейный конфликт", f"Ссора с {npc_a.first_name}", 0.7, -0.6)
-
-        # Publish event
-        bus.publish("family_conflict", {"household_id": household_id, "npc_a": npc_a, "npc_b": npc_b})
-        bus.publish("log_event", f"В доме произошел семейный конфликт между {npc_a.get_full_name()} и {npc_b.get_full_name()}.")
 
     def _process_group(self, npcs_in_loc, time_dict):
         for npc_a in npcs_in_loc:
@@ -159,6 +110,14 @@ class SocialManager:
 
         argue_score = (tension_factor * 0.5) + (npc_a.traits.get('conflict', 0) * 20) - (npc_a.traits.get('patience', 0) * 10) - (rel['trust'] * 0.2)
         argue_score -= max(-2.0, context_score) * 10.0
+
+        # Household Stress Context
+        if getattr(npc_a, 'household_id', None) and npc_a.household_id == getattr(npc_b, 'household_id', None):
+            household = self.simulation.household_manager.get_household(npc_a.household_id)
+            if household:
+                # High household stress makes argument more likely
+                argue_score += household.stress * 0.3
+
         if argue_score > 0: scores['argue'] = min(60, argue_score)
 
         flirt_score = (rel['romantic_interest'] * 0.8) + (npc_a.traits.get('boldness', 0) * 20) + (rel['affinity'] * 0.2)
@@ -259,25 +218,46 @@ class SocialManager:
             self._check_spark(npc_a, npc_b, comp, success_b, success_a, is_deep_talk=True)
 
         elif action_name == 'argue':
+            is_household_conflict = False
+            is_family_conflict = False
+            household_id = getattr(npc_a, 'household_id', None)
+
+            if household_id and household_id == getattr(npc_b, 'household_id', None):
+                is_household_conflict = True
+                parents_a = self.simulation.family_manager.get_parents(npc_a.id)
+                parents_b = self.simulation.family_manager.get_parents(npc_b.id)
+                siblings_a = self.simulation.family_manager.get_siblings(npc_a.id)
+                if npc_b in parents_a or npc_a in parents_b or npc_b in siblings_a or (npc_a.family_id is not None and npc_a.family_id == npc_b.family_id):
+                    is_family_conflict = True
+
+            event_title = "Семейный конфликт" if is_family_conflict else ("Бытовой конфликт" if is_household_conflict else "Ссора")
+
+            mem_b = self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, event_title, f"Ссора с {npc_a.first_name}", 0.6, -0.6)
+            mem_a = self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, event_title, f"Ссора с {npc_b.first_name}", 0.6, -0.6)
+
+            # If memory generation is skipped due to cooldown, do NOT apply penalties
+            if mem_a is None and mem_b is None:
+                return
+
             if rel_b_a['tension'] < 80:
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 5.0)
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', -get_gain(2.0, rel_b_a['trust'], rel_b_a))
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(4.0, rel_b_a['affinity'], rel_b_a))
             else:
-                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -1.0)
+                # Discharge tension (runaway loop breaker)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -10.0)
                 rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', -get_gain(1.0, rel_b_a['affinity'], rel_b_a))
 
             if rel_a_b['tension'] < 80:
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 3.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -get_gain(1.0, rel_a_b['trust'], rel_a_b))
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(2.0, rel_a_b['affinity'], rel_a_b))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 5.0)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', -get_gain(2.0, rel_a_b['trust'], rel_a_b))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(4.0, rel_a_b['affinity'], rel_a_b))
             else:
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -1.0)
-                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(0.5, rel_a_b['affinity'], rel_a_b))
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -10.0)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -get_gain(1.0, rel_a_b['affinity'], rel_a_b))
 
-            if rel_b_a['tension'] > 40 or rel_a_b['tension'] > 40:
-                self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Ссора", f"Ссора с {npc_a.first_name}", 0.6, -0.6)
-                self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Ссора", f"Ссора с {npc_b.first_name}", 0.4, -0.4)
+            if is_household_conflict:
+                bus.publish("family_conflict", {"household_id": household_id, "npc_a": npc_a, "npc_b": npc_b})
 
         elif action_name == 'flirt':
             success_b = (rel_b_a['romantic_interest'] * 0.5) + (rel_b_a['affinity'] * 0.2) + (comp * 10) - (rel_b_a['tension'] * 0.5) + (context_b_a * 5.0)

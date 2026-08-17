@@ -71,6 +71,20 @@ class NPC:
     def get_full_name(self):
         return f"{self.first_name} {self.last_name}"
 
+    def is_available_for_social(self):
+        """
+        Contract defining whether the NPC can physically engage in social interactions.
+        Returns False if dead, sleeping, working, studying, or otherwise incapacitated.
+        """
+        if not self.is_alive:
+            return False
+
+        # Blocking states
+        if self.state in ["Спит", "Работает", "Учится", "Мёртв"]:
+            return False
+
+        return True
+
     def update(self, time_dict):
         pass # Updated via Simulation.ai_controller
 

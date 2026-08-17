@@ -288,7 +288,8 @@ class NPCCardDialog(QDialog):
                 if target:
                     target_str = f" → {target.get_full_name()}"
 
-            item_text = f"[{mem['time']}] {mem['event_type']}{target_str}\n{mem['description']}"
+            time_str = mem.get('sim_time', mem.get('time', 'Неизвестно'))
+            item_text = f"[{time_str}] {mem['event_type']}{target_str}\n{mem['description']}"
             self.mem_list.addItem(item_text)
 
     def update_data(self):

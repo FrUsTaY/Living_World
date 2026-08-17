@@ -4,7 +4,7 @@ from living_world.engine.event_bus import bus
 
 class HouseholdManager:
     STRESS_DEATH_IMPACT = 50.0
-    STRESS_CONFLICT_IMPACT = 10.0
+    STRESS_CONFLICT_IMPACT = 2.0
     STRESS_DAILY_DECAY = 5.0
 
     def __init__(self, simulation):

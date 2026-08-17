@@ -113,25 +113,20 @@ def test_family_events_idempotency_and_stress():
     mother.current_location = "home_1"
     child.current_location = "home_1"
 
+    # We must ensure they are in an available state, otherwise process_social_ticks ignores them
+    mother.state = "Отдыхает"
+    child.state = "Отдыхает"
+
     # Force process social ticks
     sim.social_manager.tick_counter = 10
     sim.social_manager.process_social_ticks()
 
-    # Note: the chance is probabilistic.
-    # With tension=100, stress=100, affinity=-50, the conflict_chance is maxed out at 0.8
-    # There is an 80% chance for a conflict to trigger on this exact tick.
-    # We could force random.random to return 0.0 to guarantee it, but we can also just run it a few times.
-    import random
-    original_random = random.random
-    random.random = lambda: 0.0 # Guarantee success
+    # Note: we refactored _check_emergent_family_conflicts into the main pipeline.
+    # So we call `_resolve_action` directly to ensure it happens.
 
-    try:
-        sim.social_manager.tick_counter = 10
-        sim.social_manager.process_social_ticks()
-    finally:
-        random.random = original_random
+    sim.social_manager._resolve_action('argue', mother, child, sim.time.get_time_dict())
 
-    assert household.stress > 100.0 - hm.STRESS_DAILY_DECAY # It went over the decay because STRESS_CONFLICT_IMPACT (+10) was added
+    assert household.stress > 100.0 - hm.STRESS_DAILY_DECAY # It went over the decay because STRESS_CONFLICT_IMPACT (+2) was added
 
     conflict_memory_found = False
     for mem in sim.memory_manager.get_memories_for(mother.id):
@@ -140,3 +135,144 @@ def test_family_events_idempotency_and_stress():
             break
 
     assert conflict_memory_found
+
+def test_npc_card_memory_population():
+    # Regression test for GUI NPC Card Memory Population issue
+    from PySide6.QtWidgets import QApplication, QMainWindow
+    from living_world.gui.dialogs.npc_card import NPCCardDialog
+
+    # Needs a QApplication instance to run GUI code
+    app = QApplication.instance()
+    if app is None:
+        app = QApplication([])
+
+    sim = Simulation()
+    class FakeParent(QMainWindow):
+        pass
+    p = FakeParent()
+    p.sim = sim
+
+    npc1 = create_npc(sim, 'М', 20)
+    npc2 = create_npc(sim, 'Ж', 20)
+
+    sim.memory_manager.add_memory(npc1.id, npc2.id, "Test Event", "Test Desc", 1.0, 1.0)
+
+    # Initialize dialog and verify it populates memories without KeyError
+    d = NPCCardDialog(npc1, sim.city, p)
+    d._populate_memories() # Should not raise KeyError: 'time'
+
+    assert d.mem_list.count() == 1
+    item_text = d.mem_list.item(0).text()
+    assert "Test Event" in item_text
+
+def test_social_availability_and_conflict_limit():
+    sim = Simulation()
+    hm = sim.household_manager
+    fm = sim.family_manager
+    rel_mgr = sim.relationship_manager
+
+    # Create home and household
+    home_id = "test_home_1"
+    household = hm.create_household(home_id)
+
+    npc_a = create_npc(sim, "М", 30, home_id)
+    npc_b = create_npc(sim, "Ж", 28, home_id)
+    npc_a.household_id = household.id
+    npc_b.household_id = household.id
+    fm.create_family(npc_a, npc_b, sim.time.get_time_dict())
+
+    # Set up high tension/stress scenario
+    rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 100.0)
+    rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', -50.0)
+    hm.modify_stress(household.id, 100.0)
+
+    # 1. Test different locations (working)
+    npc_a.current_location = "work_1"
+    npc_b.current_location = "work_2"
+    npc_a.state = "Работает"
+    npc_b.state = "Работает"
+
+    sim.social_manager.tick_counter = 10
+    sim.social_manager.process_social_ticks()
+
+    memories_a = sim.memory_manager.get_memories_for(npc_a.id)
+    assert len(memories_a) == 1 # Just the marriage memory
+
+    # 2. Test sleeping
+    npc_a.current_location = home_id
+    npc_b.current_location = home_id
+    npc_a.state = "Спит"
+    npc_b.state = "Отдыхает"
+
+    sim.social_manager.tick_counter = 10
+    sim.social_manager.process_social_ticks()
+
+    memories_a = sim.memory_manager.get_memories_for(npc_a.id)
+    assert len(memories_a) == 1 # Still just marriage
+
+    # 3. Test runaway loop prevention
+    npc_a.state = "Отдыхает"
+
+    import random
+
+    # We don't want a divorce to randomly trigger instead of argue, so we monkey patch _select_action
+    original_select = sim.social_manager._select_action
+    sim.social_manager._select_action = lambda a, b: 'argue'
+
+    try:
+        # First tick - should conflict and create memory
+        # We bypass process_group random initiate_chance and call resolve_action directly
+        sim.social_manager._resolve_action('argue', npc_a, npc_b, sim.time.get_time_dict())
+
+        memories_a = sim.memory_manager.get_memories_for(npc_a.id)
+        assert len(memories_a) == 2
+        assert memories_a[-1]['event_type'] == "Семейный конфликт"
+
+        # Second tick right after - memory cooldown should prevent relationship penalty loop
+        # We need to simulate the social pipeline calling _resolve_action('argue') again
+        sim.social_manager._resolve_action('argue', npc_a, npc_b, sim.time.get_time_dict())
+
+        memories_a_after = sim.memory_manager.get_memories_for(npc_a.id)
+        assert len(memories_a_after) == 2 # No new memory due to cooldown
+
+    finally:
+        sim.social_manager._select_action = original_select
+
+def test_household_vs_family_conflict_and_cooldown():
+    sim = Simulation()
+    hm = sim.household_manager
+    rel_mgr = sim.relationship_manager
+
+    # Create home and household
+    home_id = "test_home_2"
+    household = hm.create_household(home_id)
+
+    # Create two NON-related NPCs
+    npc_c = create_npc(sim, "М", 30, home_id)
+    npc_d = create_npc(sim, "М", 28, home_id)
+    npc_c.household_id = household.id
+    npc_d.household_id = household.id
+
+    # 1. Test "Бытовой конфликт"
+    sim.social_manager._resolve_action('argue', npc_c, npc_d, sim.time.get_time_dict())
+
+    memories_c = sim.memory_manager.get_memories_for(npc_c.id)
+    assert len(memories_c) == 1
+    assert memories_c[-1]['event_type'] == "Бытовой конфликт"
+
+    # 2. Test cooldown
+    tension_before = rel_mgr.get_relationship(npc_c.id, npc_d.id)['tension']
+    stress_before = household.stress
+
+    # Try resolving argue again immediately
+    sim.social_manager._resolve_action('argue', npc_c, npc_d, sim.time.get_time_dict())
+
+    memories_c_after = sim.memory_manager.get_memories_for(npc_c.id)
+    assert len(memories_c_after) == 1 # Still 1 memory
+
+    tension_after = rel_mgr.get_relationship(npc_c.id, npc_d.id)['tension']
+    stress_after = household.stress
+
+    # Verify no penalties applied during cooldown
+    assert tension_before == tension_after
+    assert stress_before == stress_after

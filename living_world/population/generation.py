@@ -29,14 +29,26 @@ def generate_initial_world(city, simulation, num_npcs=25):
         hh = simulation.household_manager.create_household(h.id)
         home_households[h.id] = hh.id
 
+    generated_names = set()
+
     for _ in range(num_npcs):
         gender = random.choice(["М", "Ж"])
-        if gender == "М":
-            first_name = random.choice(MALE_FIRST_NAMES)
-            last_name = random.choice(LAST_NAMES)
-        else:
-            first_name = random.choice(FEMALE_FIRST_NAMES)
-            last_name = random.choice(LAST_NAMES) + "а"
+
+        # Ensure unique full names
+        attempts = 0
+        while True:
+            if gender == "М":
+                first_name = random.choice(MALE_FIRST_NAMES)
+                last_name = random.choice(LAST_NAMES)
+            else:
+                first_name = random.choice(FEMALE_FIRST_NAMES)
+                last_name = random.choice(LAST_NAMES) + "а"
+
+            full_name = f"{first_name} {last_name}"
+            if full_name not in generated_names or attempts > 100:
+                generated_names.add(full_name)
+                break
+            attempts += 1
 
         # Generate age safely (YOUNG_ADULT and ADULT) to avoid independent children
         age = random.randint(20, 50)
