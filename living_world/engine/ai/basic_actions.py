@@ -175,6 +175,8 @@ class SocializeAction(Action):
         if 10 <= hour < 22:
              if npc.traits.get("sociability", 0) > 0.5:
                  utility += 40
+             else:
+                 utility += 35 # Even low sociability people socialize occasionally
 
         return utility
 

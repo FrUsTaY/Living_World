@@ -17,10 +17,17 @@ class EventType(Enum):
     RELATIONSHIP_START = auto()
     MARRIAGE = auto()
     DIVORCE = auto()
+    PREGNANCY = auto()
     BIRTH = auto()
     DEATH = auto()
     MOVE = auto()
     JOB_CHANGE = auto()
+    EDUCATION_ENROLL = auto()
+    EDUCATION_GRADUATE = auto()
+    EDUCATION_EXPEL = auto()
+    FAMILY_CREATED = auto()
+    FRIENDSHIP_START = auto()
+    ROMANCE_START = auto()
     # Агрегированные типы
     AGGREGATED_SOCIAL = auto()
 

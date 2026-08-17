@@ -88,7 +88,17 @@ class ReproductionManager:
 
         p = Pregnancy(mother.id, father.id, start_date, expected_birth_date, "active")
         self.active_pregnancies.append(p)
-        bus.publish("log_event", f"{mother.get_full_name()} узнала, что ждёт ребёнка!")
+
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        if hasattr(self.simulation, 'event_aggregator'):
+            self.simulation.event_aggregator.publish_event(
+                event_type=EventType.PREGNANCY,
+                importance=EventImportance.MEDIUM,
+                message=f"{mother.get_full_name()} узнала, что ждёт ребёнка!",
+                participants=[mother.id, father.id]
+            )
+        else:
+            bus.publish("log_event", f"{mother.get_full_name()} узнала, что ждёт ребёнка!")
         return p
 
     def update(self):
@@ -172,7 +182,20 @@ class ReproductionManager:
              rel_mgr.modify_relationship(baby.id, parent.id, 'familiarity', 100)
              rel_mgr.modify_relationship(baby.id, parent.id, 'respect', 50)
 
-        bus.publish("log_event", f"У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!")
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        participants = [mother.id, baby.id]
+        if father: participants.append(father.id)
+
+        if hasattr(self.simulation, 'event_aggregator'):
+            self.simulation.event_aggregator.publish_event(
+                event_type=EventType.BIRTH,
+                importance=EventImportance.CRITICAL,
+                message=f"У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!",
+                participants=participants,
+                data={"child_id": baby.id}
+            )
+        else:
+            bus.publish("log_event", f"У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!")
 
     def load_pregnancies(self, pregnancies_data):
         self.active_pregnancies = []

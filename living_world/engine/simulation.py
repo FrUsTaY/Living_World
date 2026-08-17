@@ -71,6 +71,9 @@ class Simulation:
              # чтобы UI контролировал частоту вызовов update.
 
         # Будем считать, что при вызове update() проходит 1 минута игрового времени
+        # Важно: tick() возвращает True только если изменилась МИНУТА,
+        # а если speed слишком медленный, он может возвращать False.
+        # Для наших диагностических скриптов time_dict нужен всегда.
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
 
@@ -119,7 +122,7 @@ class Simulation:
                 self.ai_controller.choose_and_execute_action(npc, time_dict)
 
                 # Логируем смену состояния
-                if npc.state != getattr(npc, '_last_state', None):
+                if npc.state != getattr(npc, '_last_state', None) and getattr(npc, '_last_state', None) is not None:
                     self.event_aggregator.publish_event(
                         event_type=EventType.STATE_CHANGE,
                         importance=EventImportance.LOW,

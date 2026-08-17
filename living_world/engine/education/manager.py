@@ -77,7 +77,17 @@ class EducationManager:
         if inst:
              inst.unenroll(npc.id)
 
-        bus.publish("log_event", f"{npc.get_full_name()} успешно окончил обучение по программе {prog.name}.")
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        if hasattr(self.simulation, 'event_aggregator'):
+            self.simulation.event_aggregator.publish_event(
+                event_type=EventType.EDUCATION_GRADUATE,
+                importance=EventImportance.HIGH,
+                message=f"{npc.get_full_name()} успешно окончил обучение по программе {prog.name}.",
+                participants=[npc.id],
+                data={"program_name": prog.name, "qualification": record.qualification}
+            )
+        else:
+            bus.publish("log_event", f"{npc.get_full_name()} успешно окончил обучение по программе {prog.name}.")
 
     def _dropout(self, npc, record: EducationHistoryRecord, prog: EducationProgram, current_world_date: datetime):
         record.status = "Отчислен"
@@ -89,7 +99,17 @@ class EducationManager:
         if inst:
              inst.unenroll(npc.id)
 
-        bus.publish("log_event", f"{npc.get_full_name()} был отчислен с программы {prog.name}.")
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        if hasattr(self.simulation, 'event_aggregator'):
+            self.simulation.event_aggregator.publish_event(
+                event_type=EventType.EDUCATION_EXPEL,
+                importance=EventImportance.HIGH,
+                message=f"{npc.get_full_name()} был отчислен с программы {prog.name}.",
+                participants=[npc.id],
+                data={"program_name": prog.name}
+            )
+        else:
+            bus.publish("log_event", f"{npc.get_full_name()} был отчислен с программы {prog.name}.")
 
     def _process_new_education_decisions(self, npc, age: int, current_world_date: datetime):
         # 1. Eligibility (что NPC может делать по возрасту/квалификации)
@@ -166,7 +186,18 @@ class EducationManager:
                  status="Обучается"
              )
              self.history.append(record)
-             bus.publish("log_event", f"{npc.get_full_name()} поступил в {inst.name} на программу {prog.name}.")
+
+             from living_world.engine.observer.world_event import EventType, EventImportance
+             if hasattr(self.simulation, 'event_aggregator'):
+                 self.simulation.event_aggregator.publish_event(
+                     event_type=EventType.EDUCATION_ENROLL,
+                     importance=EventImportance.MEDIUM,
+                     message=f"{npc.get_full_name()} поступил в {inst.name} на программу {prog.name}.",
+                     participants=[npc.id],
+                     data={"program_name": prog.name, "institution_name": inst.name}
+                 )
+             else:
+                 bus.publish("log_event", f"{npc.get_full_name()} поступил в {inst.name} на программу {prog.name}.")
 
     def _has_qualification(self, npc_id: str, qualification: str) -> bool:
         for r in self.history:

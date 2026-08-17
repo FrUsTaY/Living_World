@@ -60,7 +60,17 @@ class FamilyManager:
         self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Брак", f"Вступил(а) в брак с {npc_b.first_name}", 1.0, 1.0)
         self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Брак", f"Вступил(а) в брак с {npc_a.first_name}", 1.0, 1.0)
 
-        bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!")
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        if hasattr(self.simulation, 'event_aggregator'):
+            self.simulation.event_aggregator.publish_event(
+                event_type=EventType.FAMILY_CREATED,
+                importance=EventImportance.HIGH,
+                message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!",
+                participants=[npc_a.id, npc_b.id]
+            )
+        else:
+            bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!")
+
         bus.publish("family_created", family)
 
     def divorce_family(self, npc_a, npc_b, time_dict):
@@ -74,7 +84,16 @@ class FamilyManager:
                     f['is_active'] = 0
                     break
 
-        bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.")
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        if hasattr(self.simulation, 'event_aggregator'):
+            self.simulation.event_aggregator.publish_event(
+                event_type=EventType.DIVORCE,
+                importance=EventImportance.HIGH,
+                message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.",
+                participants=[npc_a.id, npc_b.id]
+            )
+        else:
+            bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.")
 
     def get_parents(self, npc_id):
         npc = next((n for n in self.simulation.npcs if n.id == npc_id), None)
