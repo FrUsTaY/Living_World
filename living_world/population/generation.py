@@ -8,9 +8,17 @@ LAST_NAMES = ["Иванов", "Смирнов", "Кузнецов", "Попов"
 PROFESSIONS = ["Строитель", "Врач", "Учитель", "Продавец", "Фермер", "Механик", "Инженер", "Пекарь", "Разнорабочий"]
 
 def generate_initial_world(city, simulation, num_npcs=25):
+    from living_world.city.district import District
+
+    center = District("Центральный район", "center")
+    res_dist = District("Жилой район №1", "residential")
+    city.add_district(center)
+    city.add_district(res_dist)
+
     # Создаем базовые дома
     for i in range(10):
-        city.add_building(Building(f"Дом №{i+1}", "home", 4))
+        b = Building(f"Дом №{i+1}", "home", 4, district_id=res_dist.id)
+        city.add_building(b, district_id=res_dist.id)
 
     # Создаем базовые рабочие места и предприятия
     workplaces_data = [
@@ -21,20 +29,20 @@ def generate_initial_world(city, simulation, num_npcs=25):
         ("Стройка", "construction", 55000.0)
     ]
     for w_name, e_type, budget in workplaces_data:
-        b = Building(w_name, "work", 10)
-        city.add_building(b)
+        b = Building(w_name, "work", 10, district_id=center.id)
+        city.add_building(b, district_id=center.id)
         if hasattr(simulation, 'economy_manager'):
             simulation.economy_manager.create_enterprise(w_name, e_type, b.id, budget=budget)
 
-    city.add_building(Building("Городской парк", "park", 30))
+    city.add_building(Building("Городской парк", "park", 30, district_id=center.id), district_id=center.id)
 
-    b_cafe = Building("Городское кафе", "cafe", 15)
-    city.add_building(b_cafe)
+    b_cafe = Building("Городское кафе", "cafe", 15, district_id=center.id)
+    city.add_building(b_cafe, district_id=center.id)
     if hasattr(simulation, 'economy_manager'):
         simulation.economy_manager.create_enterprise("Городское кафе", "cafe", b_cafe.id, budget=40000.0)
 
-    b_shop = Building("Центральный магазин", "shop", 15)
-    city.add_building(b_shop)
+    b_shop = Building("Центральный магазин", "shop", 15, district_id=center.id)
+    city.add_building(b_shop, district_id=center.id)
     if hasattr(simulation, 'economy_manager'):
         simulation.economy_manager.create_enterprise("Центральный магазин", "shop", b_shop.id, budget=60000.0)
 

@@ -110,6 +110,12 @@ class WorkAction(Action):
         else:
             npc.money += 1.0
 
+        if hasattr(simulation, 'construction_manager'):
+            work_b = simulation.city.get_building(npc.work_id) if hasattr(simulation, 'city') else None
+            is_builder = npc.profession == "Строитель" or (work_b and "стройк" in work_b.name.lower())
+            if is_builder:
+                simulation.construction_manager.advance_construction(npc, minutes=1.0)
+
 class RelaxAction(Action):
     @property
     def name(self) -> str:

@@ -12,6 +12,7 @@ from living_world.engine.education.manager import EducationManager
 from living_world.engine.reproduction.manager import ReproductionManager
 from living_world.engine.economy.economy_manager import EconomyManager
 from living_world.engine.autosave_manager import AutosaveManager
+from living_world.engine.urban.construction_manager import ConstructionManager
 from living_world.engine.observer.event_journal import EventJournal
 from living_world.engine.observer.event_aggregator import EventAggregator
 from living_world.engine.observer.world_event import EventType, EventImportance
@@ -39,6 +40,7 @@ class Simulation:
         self.reproduction_manager = ReproductionManager(self)
         self.economy_manager = EconomyManager(self)
         self.autosave_manager = AutosaveManager(self)
+        self.construction_manager = ConstructionManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -131,6 +133,7 @@ class Simulation:
                 self.reproduction_manager.update()
                 self.economy_manager.daily_cycle()
                 self.autosave_manager.check_and_autosave(time_dict['day'])
+                self.construction_manager.evaluate_city_growth()
 
             for npc in self.npcs:
                 if not npc.is_alive:

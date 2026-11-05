@@ -124,8 +124,10 @@ class NPC:
             work = city.get_building(self.work_id)
             loc = city.get_building(self.current_location)
 
+            district = city.get_district_for_building(self.home_id) if hasattr(city, 'get_district_for_building') else None
             data["Дом"] = home.name if home else "Неизвестно"
             data["Место работы"] = work.name if work else "Безработный"
             data["Текущая локация"] = loc.name if loc else "На улице"
+            data["Район"] = district.name if district else "Центральный район"
 
         return data
