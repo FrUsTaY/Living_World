@@ -1,6 +1,16 @@
-
-saves/
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
+*.tmp
 
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Databases & Local Saves
+*.db
 saves/
+settings.json

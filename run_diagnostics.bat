@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
@@ -7,33 +8,24 @@ echo            Living World - Diagnostics Runner
 echo ========================================================
 echo.
 
-set "PYTHON="
+set "VENV_DIR=.venv"
+if not exist ".venv\Scripts\activate.bat" if exist "venv\Scripts\activate.bat" set "VENV_DIR=venv"
 
-py -3 --version >nul 2>&1
-if not errorlevel 1 (
-    set "PYTHON=py -3"
-    goto :found_python
-)
-python --version >nul 2>&1
-if not errorlevel 1 (
-    set "PYTHON=python"
-    goto :found_python
-)
-
-if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
-
-:found_python
-if not exist "venv\Scripts\python.exe" (
+if not exist "%VENV_DIR%\Scripts\activate.bat" (
+    set "PYTHON="
+    py -3 --version >nul 2>&1 && set "PYTHON=py -3"
+    if "%PYTHON%"=="" python --version >nul 2>&1 && set "PYTHON=python"
     if "%PYTHON%"=="" (
         echo [ERROR] Python not found.
         pause
         exit /b 1
     )
-    echo [*] Creating virtual environment...
-    %PYTHON% -m venv venv
-    "venv\Scripts\python.exe" -m pip install -r requirements.txt
+    echo [*] Creating virtual environment %VENV_DIR%...
+    %PYTHON% -m venv %VENV_DIR%
+    call "%VENV_DIR%\Scripts\activate.bat"
+    python -m pip install -r requirements.txt
+) else (
+    call "%VENV_DIR%\Scripts\activate.bat"
 )
 
 echo Select diagnostic mode:
@@ -46,14 +38,16 @@ set "choice=1"
 set /p choice="Enter choice (1-4, default 1): "
 
 if "%choice%"=="2" (
-    "venv\Scripts\python.exe" diag_suite.py --npc 15 --days 90 --seed 42
+    python diag_suite.py --npc 15 --days 90 --seed 42
 ) else if "%choice%"=="3" (
-    "venv\Scripts\python.exe" diag_suite.py --npc 25 --days 180 --seed 42
+    python run_180_days_diagnostics.py --npc 25 --days 180 --seed 42
 ) else if "%choice%"=="4" (
-    "venv\Scripts\python.exe" social_simulation.py --npc 25 --days 30
+    python diag_social_flow.py
 ) else (
-    "venv\Scripts\python.exe" diag_suite.py --npc 15 --days 30 --seed 42
+    python diag_suite.py --npc 15 --days 30 --seed 42
 )
 
 echo.
-pause
+echo ========================================================
+echo Diagnostics complete. Press any key to exit...
+pause > nul

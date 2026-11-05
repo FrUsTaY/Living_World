@@ -1,12 +1,14 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
 echo ========================================================
-echo               Living World - Launcher
+echo               Living World - Запуск симуляции
 echo ========================================================
 echo.
 
+:: 1. Поиск системного Python для создания .venv
 set "PYTHON="
 
 py -3 --version >nul 2>&1
@@ -52,52 +54,66 @@ if exist "C:\Python310\python.exe" (
     goto :found_python
 )
 
-echo [ERROR] Python was not found on this computer!
-echo Please install Python 3.10+ from https://www.python.org/
-echo Make sure to check the box: "Add python.exe to PATH" during installation.
-echo.
-pause
-exit /b 1
-
 :found_python
-echo [*] Python detected: %PYTHON%
-echo.
-
-if not exist "venv\Scripts\python.exe" (
-    echo [*] Virtual environment not found. Creating venv in %CD%\venv ...
-    %PYTHON% -m venv venv
-    if not exist "venv\Scripts\python.exe" (
-        echo [ERROR] Failed to create virtual environment.
+if "%PYTHON%"=="" (
+    if not exist ".venv\Scripts\python.exe" (
+        echo [ОШИБКА] Python не найден в системе!
+        echo Пожалуйста, установите Python 3.10+ с сайта https://www.python.org/
+        echo Обязательно отметьте галочку: "Add python.exe to PATH" при установке.
         echo.
         pause
         exit /b 1
     )
-    echo [+] Virtual environment created.
-    echo.
-    echo [*] Installing dependencies from requirements.txt...
-    "venv\Scripts\python.exe" -m pip install --upgrade pip
-    "venv\Scripts\python.exe" -m pip install -r requirements.txt
-    if errorlevel 1 (
-        echo [WARNING] Notice: some dependencies had warnings during installation.
-    ) else (
-        echo [+] Dependencies installed successfully.
+)
+
+:: 2. Создание виртуального окружения .venv (если ещё не создано)
+if not exist ".venv\Scripts\activate.bat" (
+    echo [*] Виртуальное окружение не найдено. Создание .venv ...
+    %PYTHON% -m venv .venv
+    if not exist ".venv\Scripts\activate.bat" (
+        echo [ОШИБКА] Не удалось создать виртуальное окружение .venv.
+        echo.
+        pause
+        exit /b 1
     )
+    echo [+] Виртуальное окружение .venv успешно создано.
     echo.
 )
 
-echo [*] Starting Living World GUI...
+:: 3. Активация .venv
+echo [*] Активация виртуального окружения .venv ...
+call ".venv\Scripts\activate.bat"
+if errorlevel 1 (
+    echo [ОШИБКА] Не удалось активировать .venv.
+    pause
+    exit /b 1
+)
+
+:: 4. Установка / обновление зависимостей в .venv
+echo [*] Проверка и установка зависимостей из requirements.txt в .venv ...
+python -m pip install --upgrade pip >nul 2>&1
+python -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo [ПРЕДУПРЕЖДЕНИЕ] Возникли замечания при установке некоторых пакетов.
+) else (
+    echo [+] Зависимости актуальны и готовы к работе.
+)
+echo.
+
+:: 5. Запуск приложения Living World
+echo [*] Запуск приложения Living World...
 echo ========================================================
 echo.
 
-"venv\Scripts\python.exe" main.py
+python main.py
 set "EXIT_CODE=%errorlevel%"
 
 echo.
 echo ========================================================
 if %EXIT_CODE% equ 0 (
-    echo Application finished normally.
+    echo Приложение завершило работу штатно.
 ) else (
-    echo Application exited with code: %EXIT_CODE%
+    echo Приложение завершилось с кодом ошибки: %EXIT_CODE%
 )
 echo ========================================================
 echo.

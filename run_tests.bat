@@ -1,31 +1,34 @@
 @echo off
+chcp 65001 >nul
 setlocal
 cd /d "%~dp0"
 
 echo ========================================================
-echo               Living World - Test Runner
+echo               Living World - Запуск тестов
 echo ========================================================
 echo.
 
-set "PYTHON="
-py -3 --version >nul 2>&1
-if not errorlevel 1 set "PYTHON=py -3"
-if "%PYTHON%"=="" python --version >nul 2>&1 && set "PYTHON=python"
+set "VENV_DIR=.venv"
+if not exist ".venv\Scripts\activate.bat" if exist "venv\Scripts\activate.bat" set "VENV_DIR=venv"
 
-if not exist "venv\Scripts\python.exe" (
+if not exist "%VENV_DIR%\Scripts\activate.bat" (
+    set "PYTHON="
+    py -3 --version >nul 2>&1 && set "PYTHON=py -3"
+    if "%PYTHON%"=="" python --version >nul 2>&1 && set "PYTHON=python"
     if "%PYTHON%"=="" (
-        echo [ERROR] Python not found.
+        echo [ОШИБКА] Python не найден.
         pause
         exit /b 1
     )
-    echo [*] Creating virtual environment...
-    %PYTHON% -m venv venv
-    "venv\Scripts\python.exe" -m pip install -r requirements.txt
+    echo [*] Создание виртуального окружения %VENV_DIR%...
+    %PYTHON% -m venv %VENV_DIR%
 )
 
-echo [*] Running tests...
+call "%VENV_DIR%\Scripts\activate.bat"
+python -m pip install -r requirements.txt >nul 2>&1
+
+echo [*] Запуск набора тестов pytest...
 echo.
-"venv\Scripts\python.exe" test_social_progression_and_dating.py
-"venv\Scripts\python.exe" run_all_tests.py
+pytest
 echo.
 pause
