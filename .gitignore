@@ -1,4 +1,6 @@
 
 saves/
+__pycache__/
+*.py[cod]
 
 saves/
