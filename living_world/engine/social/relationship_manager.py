@@ -138,7 +138,6 @@ class RelationshipManager:
 
         current_time = self.simulation.time.get_total_minutes()
         rel_decayed['last_interaction_time'] = current_time
-        rel_decayed['last_meaningful_interaction_time'] = current_time
 
         self.relationships[key] = rel_decayed
         rel = self.relationships[key]
