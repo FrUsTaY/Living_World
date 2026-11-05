@@ -57,11 +57,13 @@ class NPC:
 
     def get_life_stage(self, current_world_date: datetime) -> LifeStage:
         current_date_tuple = (current_world_date.year, current_world_date.month, current_world_date.day)
-        if getattr(self, '_last_stage_date', None) == current_date_tuple:
+        if (getattr(self, '_last_stage_date', None) == current_date_tuple and
+                getattr(self, '_last_stage_alive', None) == self.is_alive):
             return self._cached_stage
         age = self.get_age(current_world_date)
         self._cached_stage = LifeCycleManager.get_life_stage(age, self.is_alive)
         self._last_stage_date = current_date_tuple
+        self._last_stage_alive = self.is_alive
         return self._cached_stage
 
     def _generate_traits(self):
