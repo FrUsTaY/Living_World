@@ -7,7 +7,6 @@ from living_world.engine.social.household import Household
 from living_world.population.npc import NPC
 from living_world.database.repository import Database
 from living_world.city.city import Building
-import os
 
 def create_npc(sim, gender, age_years, home_id="home_1"):
     birth_date = sim.time.current_datetime - timedelta(days=age_years * 365)
@@ -162,12 +161,8 @@ def test_biological_parent_in_different_household():
     # У матери приоритет (она и био родитель, и в том же домохозяйстве, и рядом физически)
     assert utility_mother > utility_father
 
-def test_db_save_load_household():
-    db_path = "/tmp/test_hh_save.db"
-    if os.path.exists(db_path):
-        os.remove(db_path)
-
-    db = Database(db_path)
+def test_db_save_load_household(tmp_path):
+    db = Database(str(tmp_path / "test_hh_save.db"))
     sim = Simulation()
     hm = sim.household_manager
 
@@ -197,9 +192,6 @@ def test_db_save_load_household():
 
     assert len(npcs_data) == 1
     assert npcs_data[0]['household_id'] == hh.id
-
-    if os.path.exists(db_path):
-        os.remove(db_path)
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__])
