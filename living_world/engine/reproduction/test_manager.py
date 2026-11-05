@@ -100,5 +100,5 @@ def test_mother_death():
     mgr.active_pregnancies.append(p)
     sim.time.current_datetime = end + timedelta(days=1)
     mgr.update()
-    assert p.status == "completed"
+    assert p.status == "cancelled"
     assert len(sim.npcs) == 1
