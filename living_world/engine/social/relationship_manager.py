@@ -188,3 +188,44 @@ class RelationshipManager:
 
     def get_all_relationships(self):
         return list(self.relationships.values())
+
+    def get_relationship_status_ru(self, source_id, target_id):
+        key = (source_id, target_id)
+        rel = self.get_relationship(source_id, target_id)
+        if not rel or rel.get("familiarity", 0) == 0:
+            return "Незнакомцы"
+
+        if hasattr(self.simulation, "family_manager"):
+            parents = self.simulation.family_manager.get_parents(source_id)
+            if any(p.id == target_id for p in parents):
+                return "Родитель"
+            children = self.simulation.family_manager.get_children(source_id)
+            if any(c.id == target_id for c in children):
+                return "Ребёнок"
+            spouse = self.simulation.family_manager.get_spouse(source_id)
+            if spouse and spouse.id == target_id:
+                return "Супруги"
+
+        source_npc = next((n for n in self.simulation.npcs if n.id == source_id), None)
+        if source_npc and getattr(source_npc, "dating_partner_id", None) == target_id:
+            return "Встречаются"
+
+        romance = rel.get("romantic_interest", 0.0)
+        affinity = rel.get("affinity", 0.0)
+        trust = rel.get("trust", 0.0)
+        tension = rel.get("tension", 0.0)
+        familiarity = rel.get("familiarity", 0.0)
+
+        if tension > 45 or affinity < -25:
+            return "Вражда / Конфликт"
+        if affinity < -5:
+            return "Неприязнь"
+        if romance >= 35:
+            return "Влюбленность"
+        if affinity >= 60 and trust >= 35:
+            return "Лучшие друзья"
+        if affinity >= 25:
+            return "Друзья"
+        if familiarity >= 10:
+            return "Знакомые"
+        return "Нейтральные"

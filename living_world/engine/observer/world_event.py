@@ -15,6 +15,7 @@ class EventType(Enum):
     CONFLICT_MINOR = auto()
     CONFLICT_MAJOR = auto()
     RELATIONSHIP_START = auto()
+    RELATIONSHIP_END = auto()
     MARRIAGE = auto()
     DIVORCE = auto()
     PREGNANCY = auto()

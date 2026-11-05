@@ -190,3 +190,9 @@ class FamilyManager:
                 siblings.append(other)
 
         return siblings
+
+    def get_spouse(self, npc_id):
+        npc = next((n for n in self.simulation.npcs if n.id == npc_id), None)
+        if not npc or not npc.family_id:
+            return None
+        return next((n for n in self.simulation.npcs if n.id != npc_id and n.family_id == npc.family_id and n.is_alive), None)

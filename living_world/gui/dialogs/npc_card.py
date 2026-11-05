@@ -146,8 +146,8 @@ class NPCCardDialog(QDialog):
         layout = QVBoxLayout(self.rel_tab)
 
         self.rel_table = QTableWidget()
-        self.rel_table.setColumnCount(4)
-        self.rel_table.setHorizontalHeaderLabels(["NPC", "Знакомство", "Симпатия", "Доверие"])
+        self.rel_table.setColumnCount(5)
+        self.rel_table.setHorizontalHeaderLabels(["NPC", "Статус", "Симпатия", "Доверие", "Напряжение"])
         self.rel_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.rel_table.setEditTriggers(QTableWidget.NoEditTriggers)
 
@@ -286,10 +286,12 @@ class NPCCardDialog(QDialog):
             target = next((n for n in self.sim.npcs if n.id == rel['target_npc_id']), None)
             name = target.get_full_name() if target else "Неизвестный"
 
+            status = self.sim.relationship_manager.get_relationship_status_ru(self.npc.id, rel['target_npc_id'])
             self.rel_table.setItem(row, 0, QTableWidgetItem(name))
-            self.rel_table.setItem(row, 1, QTableWidgetItem(f"{rel['familiarity']:.1f}"))
+            self.rel_table.setItem(row, 1, QTableWidgetItem(status))
             self.rel_table.setItem(row, 2, QTableWidgetItem(f"{rel['affinity']:.1f}"))
             self.rel_table.setItem(row, 3, QTableWidgetItem(f"{rel['trust']:.1f}"))
+            self.rel_table.setItem(row, 4, QTableWidgetItem(f"{rel['tension']:.1f}"))
 
     def _populate_history(self):
         if not self.sim: return

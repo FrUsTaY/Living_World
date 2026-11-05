@@ -148,6 +148,29 @@ class SocialManager:
                 propose_score = 10 + (npc_a.traits.get('boldness', 0) * 15) + (rel['romantic_interest'] - 50) + (rel['trust'] - 30) + (context_score * 4) + (inclination_a * 15)
                 if propose_score > 0: scores['propose'] = propose_score
 
+        # Apology check
+        if rel['tension'] > 20 and rel['affinity'] > -20:
+            empathy_a = npc_a.traits.get('empathy', 0.0)
+            friendliness_a = npc_a.traits.get('friendliness', 0.0)
+            if empathy_a > -0.2 or friendliness_a > 0.0:
+                apology_score = (rel['tension'] * 0.35) + (empathy_a * 15) + (friendliness_a * 10) - (npc_a.traits.get('conflict', 0) * 15)
+                if apology_score > 0:
+                    scores['apology'] = apology_score
+
+        # Help / Gift check
+        if rel['familiarity'] >= 15 and rel['affinity'] >= 20 and getattr(npc_a, 'money', 0) >= 1200:
+            if npc_a.traits.get('frugality', 0) < 0.3 and (getattr(npc_b, 'money', 0) < 800 or getattr(npc_b, 'mood', 100) < 45):
+                help_score = 15 + (npc_a.traits.get('empathy', 0) * 15) + (rel['affinity'] * 0.15) - (npc_a.traits.get('frugality', 0) * 15)
+                if help_score > 0:
+                    scores['help_or_gift'] = help_score
+
+        # Breakup Check (dating partners before marriage with severe tension/loss of romance)
+        if getattr(npc_a, 'dating_partner_id', None) == npc_b.id and npc_a.family_id is None:
+            if rel['tension'] >= 40 and rel['affinity'] <= 15 and rel['romantic_interest'] <= 25:
+                breakup_score = 15 + (rel['tension'] * 0.4) - (rel['affinity'] * 0.5) - (rel['romantic_interest'] * 0.5)
+                if breakup_score > 0:
+                    scores['breakup'] = breakup_score
+
         actions = list(scores.keys())
         weights = list(scores.values())
         if not actions: return 'chat'
@@ -156,7 +179,7 @@ class SocialManager:
     def _resolve_action(self, action_name, npc_a, npc_b, time_dict):
         rel_mgr = self.simulation.relationship_manager
 
-        is_meaningful = action_name in ['deep_talk', 'flirt', 'argue', 'propose', 'divorce']
+        is_meaningful = action_name in ['deep_talk', 'flirt', 'argue', 'propose', 'divorce', 'apology', 'help_or_gift', 'breakup']
 
         if action_name == 'greeting':
             self._handle_greeting(npc_a, npc_b, time_dict)
@@ -397,6 +420,78 @@ class SocialManager:
 
             self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Развод", f"Развелся с {npc_b.first_name}", 1.0, -1.0)
             self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Развод", f"Развелся с {npc_a.first_name}", 1.0, -1.0)
+
+        elif action_name == 'apology':
+            comp = CompatibilityManager.calculate_compatibility(npc_a, npc_b)
+            accept_chance = 0.75 + (npc_b.traits.get('empathy', 0) * 0.2) + (npc_a.traits.get('empathy', 0) * 0.1) + (comp * 0.1)
+            accept_chance = max(0.2, min(0.98, accept_chance))
+            if random.random() < accept_chance:
+                relief = 20.0 + (npc_a.traits.get('empathy', 0) * 5.0)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -relief)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -relief)
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 4.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 4.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', 3.0)
+                npc_a.mood = min(100.0, npc_a.mood + 5.0)
+                npc_b.mood = min(100.0, npc_b.mood + 5.0)
+
+                self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Примирение", f"Помирился с {npc_b.first_name}", 0.4, 0.5)
+                self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Примирение", f"Принял(а) извинения {npc_a.first_name}", 0.4, 0.5)
+
+                from living_world.engine.observer.world_event import EventType, EventImportance
+                if hasattr(self.simulation, 'event_aggregator'):
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.SOCIAL_INTERACTION,
+                        importance=EventImportance.LOW,
+                        message=f"{npc_a.get_full_name()} принес(ла) извинения {npc_b.get_full_name()}, разногласия улажены.",
+                        participants=[npc_a.id, npc_b.id]
+                    )
+            else:
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 2.0)
+
+        elif action_name == 'help_or_gift':
+            gift_sum = 500.0
+            if npc_a.money >= gift_sum:
+                npc_a.money -= gift_sum
+                npc_b.money += gift_sum
+                rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 4.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 8.0)
+                rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', 5.0)
+                if rel_b_a['tension'] > 0:
+                    rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -5.0)
+                npc_b.mood = min(100.0, npc_b.mood + 8.0)
+
+                self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Помощь", f"Оказал(а) поддержку {npc_b.first_name}", 0.4, 0.5)
+                self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Помощь", f"{npc_a.first_name} выручил(а) в нужный момент", 0.5, 0.7)
+
+                from living_world.engine.observer.world_event import EventType, EventImportance
+                if hasattr(self.simulation, 'event_aggregator'):
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.ECONOMIC,
+                        importance=EventImportance.LOW,
+                        message=f"{npc_a.get_full_name()} оказал(а) материальную поддержку {npc_b.get_full_name()}.",
+                        participants=[npc_a.id, npc_b.id]
+                    )
+
+        elif action_name == 'breakup':
+            npc_a.dating_partner_id = None
+            npc_b.dating_partner_id = None
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', 15.0)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', 15.0)
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'romantic_interest', -20.0)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'romantic_interest', -20.0)
+
+            self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Расставание", f"Расстался(лась) с {npc_b.first_name}", 0.7, -0.6)
+            self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Расставание", f"Расстался(лась) с {npc_a.first_name}", 0.7, -0.6)
+
+            from living_world.engine.observer.world_event import EventType, EventImportance
+            if hasattr(self.simulation, 'event_aggregator'):
+                self.simulation.event_aggregator.publish_event(
+                    event_type=EventType.RELATIONSHIP_END,
+                    importance=EventImportance.MEDIUM,
+                    message=f"Пара {npc_a.get_full_name()} и {npc_b.get_full_name()} распалась.",
+                    participants=[npc_a.id, npc_b.id]
+                )
 
     def _check_spark(self, npc_a, npc_b, comp, success_b, success_a, is_deep_talk=False):
         current_date = self.simulation.time.current_datetime
