@@ -9,7 +9,7 @@ class NPC:
 
     def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id,
                  npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None, health=100.0,
-                 hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0):
+                 hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0, alimony_to_id=None):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -45,6 +45,7 @@ class NPC:
 
         self.current_education_id = None
         self.education_status = None
+        self.alimony_to_id = alimony_to_id
 
         self.hygiene = float(hygiene)
         self.stress = float(stress)
@@ -136,7 +137,8 @@ class NPC:
             "Энергия": f"{int(self.energy)}%",
             "Голод": f"{int(self.hunger)}%",
             "Состояние": self.state,
-            "Партнёр": self.dating_partner_id if self.dating_partner_id else "Нет"
+            "Партнёр": self.dating_partner_id if self.dating_partner_id else "Нет",
+            "Алименты": "Выплачивает" if self.alimony_to_id else "Нет"
         }
 
         if city:
@@ -151,3 +153,13 @@ class NPC:
             data["Район"] = district.name if district else "Центральный район"
 
         return data
+
+    def get_colleagues(self, simulation):
+        if not self.work_id:
+            return []
+        return [n for n in simulation.npcs if n.is_alive and n.id != self.id and n.work_id == self.work_id]
+
+    def get_neighbors(self, simulation):
+        if not self.home_id:
+            return []
+        return [n for n in simulation.npcs if n.is_alive and n.id != self.id and n.home_id == self.home_id]

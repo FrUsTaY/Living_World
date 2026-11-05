@@ -169,13 +169,47 @@ class FamilyManager:
                     f['is_active'] = 0
                     break
 
+        # Раздел совместно нажитого имущества 50/50
+        total_money = npc_a.money + npc_b.money
+        npc_a.money = round(total_money / 2.0, 2)
+        npc_b.money = round(total_money / 2.0, 2)
+
+        # Определение опеки над несовершеннолетними детьми и алиментов
+        current_date = self.simulation.time.current_datetime
+        minor_children = [
+            c for c in self.get_children(npc_a.id)
+            if c in self.get_children(npc_b.id) and c.is_alive and c.get_age(current_date) < 18
+        ]
+
+        custodial = npc_b if npc_b.gender == 'Ж' else npc_a
+        non_custodial = npc_a if custodial.id == npc_b.id else npc_b
+
+        if minor_children:
+            non_custodial.alimony_to_id = custodial.id
+            for child in minor_children:
+                child.home_id = custodial.home_id
+                child.household_id = custodial.household_id
+
+        # Разъезд: non_custodial переезжает в другой дом при наличии свободных
+        if hasattr(self.simulation, 'city'):
+            homes = self.simulation.city.get_homes()
+            other_homes = [h for h in homes if h.id != custodial.home_id]
+            if other_homes:
+                import random
+                new_home = random.choice(other_homes)
+                non_custodial.home_id = new_home.id
+                if hasattr(self.simulation, 'household_manager'):
+                    new_hh = self.simulation.household_manager.create_household(new_home.id)
+                    non_custodial.household_id = new_hh.id
+
+        alimony_info = f" Назначены алименты в пользу {custodial.get_full_name()}." if minor_children else ""
         from living_world.engine.observer.world_event import EventType, EventImportance
         if hasattr(self.simulation, 'event_aggregator'):
             self.simulation.event_aggregator.publish_event(
                 event_type=EventType.DIVORCE,
                 importance=EventImportance.HIGH,
-                message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.",
-                participants=[npc_a.id, npc_b.id]
+                message=f"💔 {npc_a.get_full_name()} и {npc_b.get_full_name()} развелись. Имущество разделено 50/50 ({npc_a.money:,.0f} ₽ каждому).{alimony_info}",
+                participants=[npc_a.id, npc_b.id] + [c.id for c in minor_children]
             )
         else:
             bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} развелись.")

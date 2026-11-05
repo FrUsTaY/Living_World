@@ -214,53 +214,85 @@ class Simulation:
 
         # 2. Отделение повзрослевших детей и переезд в свободные дома
         homes = self.city.get_homes() if hasattr(self, 'city') else []
-        if not homes:
-            return
+        if homes:
 
-        home_occupants = {h.id: 0 for h in homes}
-        for n in self.npcs:
-            if n.is_alive and n.home_id in home_occupants:
-                home_occupants[n.home_id] += 1
+            home_occupants = {h.id: 0 for h in homes}
+            for n in self.npcs:
+                if n.is_alive and n.home_id in home_occupants:
+                    home_occupants[n.home_id] += 1
 
+            for npc in self.npcs:
+                if not npc.is_alive:
+                    continue
+                stage = npc.get_life_stage(current_date)
+                if stage in [LifeStage.YOUNG_ADULT, LifeStage.ADULT]:
+                    parents = self.family_manager.get_parents(npc.id) if hasattr(self, 'family_manager') else []
+                    living_with_parent = any(p.is_alive and p.home_id == npc.home_id for p in parents)
+                    if living_with_parent and (npc.money >= 10000.0 or getattr(npc, 'family_id', None) is not None):
+                        available_homes = [h for h in homes if h.id != npc.home_id and home_occupants[h.id] < h.capacity]
+                        if available_homes and random.random() < 0.25:
+                            target_home = random.choice(available_homes)
+                            old_home_id = npc.home_id
+                            new_hh = self.household_manager.create_household(target_home.id) if hasattr(self, 'household_manager') else None
+
+                            npc.home_id = target_home.id
+                            if new_hh:
+                                npc.household_id = new_hh.id
+                            home_occupants[old_home_id] -= 1
+                            home_occupants[target_home.id] += 1
+
+                            spouse = self.family_manager.get_spouse(npc.id) if hasattr(self, 'family_manager') else None
+                            if spouse and spouse.home_id != target_home.id and spouse.home_id in home_occupants:
+                                home_occupants[spouse.home_id] -= 1
+                                spouse.home_id = target_home.id
+                                if new_hh:
+                                    spouse.household_id = new_hh.id
+                                home_occupants[target_home.id] += 1
+
+                            if hasattr(self, 'memory_manager'):
+                                self.memory_manager.add_memory(
+                                    npc.id, None, "Переезд", f"Начал(а) самостоятельную жизнь, переехав в {target_home.name}", 0.7, 0.8
+                                )
+                            if hasattr(self, 'event_aggregator'):
+                                self.event_aggregator.publish_event(
+                                    event_type=EventType.MOVE,
+                                    importance=EventImportance.MEDIUM,
+                                    message=f"{npc.get_full_name()} начал(а) самостоятельную жизнь и переехал(а) в {target_home.name}.",
+                                    participants=[npc.id] + ([spouse.id] if spouse else [])
+                                )
+
+        # 3. Выплата алиментов на содержание несовершеннолетних детей
         for npc in self.npcs:
             if not npc.is_alive:
                 continue
-            stage = npc.get_life_stage(current_date)
-            if stage in [LifeStage.YOUNG_ADULT, LifeStage.ADULT]:
-                parents = self.family_manager.get_parents(npc.id) if hasattr(self, 'family_manager') else []
-                living_with_parent = any(p.is_alive and p.home_id == npc.home_id for p in parents)
-                if living_with_parent and (npc.money >= 10000.0 or getattr(npc, 'family_id', None) is not None):
-                    available_homes = [h for h in homes if h.id != npc.home_id and home_occupants[h.id] < h.capacity]
-                    if available_homes and random.random() < 0.25:
-                        target_home = random.choice(available_homes)
-                        old_home_id = npc.home_id
-                        new_hh = self.household_manager.create_household(target_home.id) if hasattr(self, 'household_manager') else None
+            alimony_to = getattr(npc, 'alimony_to_id', None)
+            if not alimony_to:
+                continue
 
-                        npc.home_id = target_home.id
-                        if new_hh:
-                            npc.household_id = new_hh.id
-                        home_occupants[old_home_id] -= 1
-                        home_occupants[target_home.id] += 1
+            custodial = next((n for n in self.npcs if n.id == alimony_to and n.is_alive), None)
+            if not custodial:
+                npc.alimony_to_id = None
+                continue
 
-                        spouse = self.family_manager.get_spouse(npc.id) if hasattr(self, 'family_manager') else None
-                        if spouse and spouse.home_id != target_home.id and spouse.home_id in home_occupants:
-                            home_occupants[spouse.home_id] -= 1
-                            spouse.home_id = target_home.id
-                            if new_hh:
-                                spouse.household_id = new_hh.id
-                            home_occupants[target_home.id] += 1
+            minor_children = [
+                c for c in self.family_manager.get_children(npc.id)
+                if c.is_alive and c.get_age(current_date) < 18
+            ]
+            if not minor_children:
+                npc.alimony_to_id = None
+                continue
 
-                        if hasattr(self, 'memory_manager'):
-                            self.memory_manager.add_memory(
-                                npc.id, None, "Переезд", f"Начал(а) самостоятельную жизнь, переехав в {target_home.name}", 0.7, 0.8
-                            )
-                        if hasattr(self, 'event_aggregator'):
-                            self.event_aggregator.publish_event(
-                                event_type=EventType.MOVE,
-                                importance=EventImportance.MEDIUM,
-                                message=f"{npc.get_full_name()} начал(а) самостоятельную жизнь и переехал(а) в {target_home.name}.",
-                                participants=[npc.id] + ([spouse.id] if spouse else [])
-                            )
+            alimony_amount = min(npc.money * 0.25, 2500.0)
+            if alimony_amount >= 100.0:
+                npc.money -= alimony_amount
+                custodial.money += alimony_amount
+                if hasattr(self, 'event_aggregator'):
+                    self.event_aggregator.publish_event(
+                        event_type=EventType.ECONOMIC,
+                        importance=EventImportance.LOW,
+                        message=f"⚖ Алименты: {npc.get_full_name()} перечислил(а) {alimony_amount:,.0f} ₽ {custodial.get_full_name()} на содержание детей ({len(minor_children)} чел.).",
+                        participants=[npc.id, custodial.id] + [c.id for c in minor_children]
+                    )
 
     def _process_daily_health(self):
         import random

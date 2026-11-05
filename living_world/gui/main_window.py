@@ -265,6 +265,7 @@ class MainWindow(QMainWindow):
                     npc.chronotype = nd.get('chronotype') or random.choice(['lark', 'owl'])
                     npc.is_sick = bool(nd.get('is_sick', 0))
                     npc.sick_days = int(nd.get('sick_days', 0))
+                    npc.alimony_to_id = nd.get('alimony_to_id')
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']

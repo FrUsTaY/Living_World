@@ -45,7 +45,8 @@ CREATE TABLE IF NOT EXISTS npcs (
     hobby TEXT DEFAULT 'Чтение',
     chronotype TEXT DEFAULT 'lark',
     is_sick INTEGER DEFAULT 0,
-    sick_days INTEGER DEFAULT 0
+    sick_days INTEGER DEFAULT 0,
+    alimony_to_id TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -264,6 +265,8 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN is_sick INTEGER DEFAULT 0")
             if 'sick_days' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN sick_days INTEGER DEFAULT 0")
+            if 'alimony_to_id' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN alimony_to_id TEXT DEFAULT NULL")
 
             cursor.execute("PRAGMA table_info(families)")
             columns_fam = [info[1] for info in cursor.fetchall()]
@@ -398,8 +401,8 @@ class Database:
                     trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience,
                     trait_ambition, trait_frugality, trait_diligence, health, family_id,
                     date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id,
-                    hygiene, stress, hobby, chronotype, is_sick, sick_days)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -428,7 +431,8 @@ class Database:
                      getattr(npc, 'hobby', 'Чтение'),
                      getattr(npc, 'chronotype', 'lark'),
                      1 if getattr(npc, 'is_sick', False) else 0,
-                     getattr(npc, 'sick_days', 0))
+                     getattr(npc, 'sick_days', 0),
+                     getattr(npc, 'alimony_to_id', None))
                 )
 
             # Сохраняем семьи

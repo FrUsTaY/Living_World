@@ -73,6 +73,12 @@ class SocialManager:
         if getattr(npc_a, 'dating_partner_id', None) == npc_b.id:
             appeal += 25.0
 
+        # Phase 2: Colleagues & Neighbors boost
+        if npc_a.work_id and npc_a.work_id == npc_b.work_id:
+            appeal += 12.0
+        if npc_a.home_id and npc_a.home_id == npc_b.home_id:
+            appeal += 10.0
+
         # Recovery: memories boost appeal significantly for old friends
         if context_score > 0 and rel['affinity'] < 20:
             appeal += context_score * 15.0
@@ -171,6 +177,14 @@ class SocialManager:
                 if breakup_score > 0:
                     scores['breakup'] = breakup_score
 
+        # Colleague work talk
+        if npc_a.work_id and npc_a.work_id == npc_b.work_id and npc_a.current_location == npc_a.work_id:
+            scores['colleague_talk'] = 24.0 + (npc_a.traits.get('diligence', 0.0) * 10.0)
+
+        # Neighbor community talk
+        if npc_a.home_id and npc_a.home_id == npc_b.home_id and npc_a.family_id != npc_b.family_id:
+            scores['neighbor_talk'] = 20.0 + (npc_a.traits.get('friendliness', 0.0) * 10.0)
+
         actions = list(scores.keys())
         weights = list(scores.values())
         if not actions: return 'chat'
@@ -179,7 +193,7 @@ class SocialManager:
     def _resolve_action(self, action_name, npc_a, npc_b, time_dict):
         rel_mgr = self.simulation.relationship_manager
 
-        is_meaningful = action_name in ['deep_talk', 'flirt', 'argue', 'propose', 'divorce', 'apology', 'help_or_gift', 'breakup']
+        is_meaningful = action_name in ['deep_talk', 'flirt', 'argue', 'propose', 'divorce', 'apology', 'help_or_gift', 'breakup', 'colleague_talk', 'neighbor_talk']
 
         if action_name == 'greeting':
             self._handle_greeting(npc_a, npc_b, time_dict)
@@ -558,3 +572,27 @@ class SocialManager:
                     message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} познакомились.",
                     participants=[npc_a.id, npc_b.id]
                 )
+
+        elif action_name == 'colleague_talk':
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'familiarity', 2.0)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'familiarity', 2.0)
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'trust', 1.5)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'trust', 1.5)
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 1.5)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 1.5)
+            npc_a.mood = min(100.0, npc_a.mood + 1.0)
+            npc_b.mood = min(100.0, npc_b.mood + 1.0)
+            if random.random() < 0.25:
+                self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Работа", f"Обсудили рабочие вопросы с коллегой {npc_b.first_name}", 0.3, 0.4)
+                self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Работа", f"Обсудили рабочие вопросы с коллегой {npc_a.first_name}", 0.3, 0.4)
+
+        elif action_name == 'neighbor_talk':
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'familiarity', 1.8)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'familiarity', 1.8)
+            rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'affinity', 2.0)
+            rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'affinity', 2.0)
+            if rel_a_b['tension'] > 0: rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -1.5)
+            if rel_b_a['tension'] > 0: rel_mgr.modify_relationship(npc_b.id, npc_a.id, 'tension', -1.5)
+            if random.random() < 0.25:
+                self.simulation.memory_manager.add_memory(npc_a.id, npc_b.id, "Соседи", f"Приветливый разговор с соседом {npc_b.first_name}", 0.3, 0.4)
+                self.simulation.memory_manager.add_memory(npc_b.id, npc_a.id, "Соседи", f"Приветливый разговор с соседом {npc_a.first_name}", 0.3, 0.4)
