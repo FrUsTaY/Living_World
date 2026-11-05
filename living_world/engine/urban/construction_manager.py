@@ -222,6 +222,9 @@ class ConstructionManager:
                     if not already_commissioned and random.random() < 0.2:
                         self.order_private_home(npc)
 
+        # 5. Износ зданий и капитальный ремонт
+        self.maintain_infrastructure()
+
     def order_private_home(self, npc, house_name: Optional[str] = None) -> Optional[ConstructionProject]:
         cost = 35000.0
         econ = getattr(self.simulation, "economy_manager", None)
@@ -376,3 +379,22 @@ class ConstructionManager:
                     moved += 1
                     if moved >= capacity:
                         break
+
+    def maintain_infrastructure(self):
+        city = getattr(self.simulation, "city", None)
+        econ = getattr(self.simulation, "economy_manager", None)
+        if not city:
+            return
+
+        for b in city.buildings:
+            b.condition = max(10.0, getattr(b, 'condition', 100.0) - 0.05)
+            if b.condition < 70.0 and econ and econ.city_treasury >= 5000.0:
+                econ.city_treasury -= 5000.0
+                b.condition = 100.0
+                if hasattr(self.simulation, "event_aggregator"):
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.ECONOMIC,
+                        importance=EventImportance.LOW,
+                        message=f"🛠 Муниципальные службы провели капитальный ремонт здания '{b.name}'.",
+                        participants=[]
+                    )

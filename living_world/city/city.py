@@ -3,12 +3,15 @@ from typing import List, Optional
 from living_world.city.district import District
 
 class Building:
-    def __init__(self, name, b_type, capacity, b_id=None, district_id=None):
+    def __init__(self, name, b_type, capacity, b_id=None, district_id=None, x: float = 0.0, y: float = 0.0, condition: float = 100.0):
         self.id = b_id or str(uuid.uuid4())
         self.name = name
         self.b_type = b_type # 'home', 'work', 'park', 'cafe', 'shop', 'public'
         self.capacity = capacity
         self.district_id = district_id
+        self.x = float(x)
+        self.y = float(y)
+        self.condition = float(condition)
 
 class City:
     def __init__(self):
@@ -58,3 +61,11 @@ class City:
             if b.id == b_id:
                 return b
         return None
+
+    def calculate_distance(self, b_id_1: str, b_id_2: str) -> float:
+        b1 = self.get_building(b_id_1)
+        b2 = self.get_building(b_id_2)
+        if not b1 or not b2:
+            return 0.0
+        import math
+        return math.sqrt((b1.x - b2.x)**2 + (b1.y - b2.y)**2)

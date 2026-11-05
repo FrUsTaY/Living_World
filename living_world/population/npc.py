@@ -11,7 +11,8 @@ class NPC:
                  npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None, health=100.0,
                  hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0, alimony_to_id=None,
                  career_level=1, work_experience_days=0,
-                 is_renting=False, mortgage_debt=0.0, mortgage_payment=0.0):
+                 is_renting=False, mortgage_debt=0.0, mortgage_payment=0.0,
+                 transport_mode=None):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -53,6 +54,7 @@ class NPC:
         self.is_renting = bool(is_renting)
         self.mortgage_debt = float(mortgage_debt)
         self.mortgage_payment = float(mortgage_payment)
+        self.transport_mode = transport_mode or ("car" if self.money >= 50000.0 else "foot")
 
         self.hygiene = float(hygiene)
         self.stress = float(stress)
@@ -147,7 +149,8 @@ class NPC:
             "Состояние": self.state,
             "Партнёр": self.dating_partner_id if self.dating_partner_id else "Нет",
             "Алименты": "Выплачивает" if self.alimony_to_id else "Нет",
-            "Ипотека": f"{self.mortgage_debt:,.0f} ₽ ({self.mortgage_payment:,.0f} ₽/день)" if self.mortgage_debt > 0 else "Нет"
+            "Ипотека": f"{self.mortgage_debt:,.0f} ₽ ({self.mortgage_payment:,.0f} ₽/день)" if self.mortgage_debt > 0 else "Нет",
+            "Транспорт": "Автомобиль" if self.transport_mode == "car" else ("Автобус" if self.transport_mode == "bus" else "Пешком")
         }
 
         if city:

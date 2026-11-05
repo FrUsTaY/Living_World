@@ -214,7 +214,13 @@ class MainWindow(QMainWindow):
 
                 from living_world.city.city import Building
                 for b in b_dicts:
-                    self.sim.city.add_building(Building(b['name'], b['type'], b['capacity'], b['id']))
+                    self.sim.city.add_building(Building(
+                        b['name'], b['type'], b['capacity'], b['id'],
+                        district_id=b.get('district_id'),
+                        x=float(b.get('x', 0.0)),
+                        y=float(b.get('y', 0.0)),
+                        condition=float(b.get('condition', 100.0))
+                    ), district_id=b.get('district_id'))
 
                 # Recreate households
                 if hasattr(self.sim, 'household_manager') and households_dicts:
@@ -271,6 +277,7 @@ class MainWindow(QMainWindow):
                     npc.is_renting = bool(nd.get('is_renting', 0))
                     npc.mortgage_debt = float(nd.get('mortgage_debt', 0.0))
                     npc.mortgage_payment = float(nd.get('mortgage_payment', 0.0))
+                    npc.transport_mode = nd.get('transport_mode', 'foot')
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']

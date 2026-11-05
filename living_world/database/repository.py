@@ -51,14 +51,19 @@ CREATE TABLE IF NOT EXISTS npcs (
     work_experience_days INTEGER DEFAULT 0,
     is_renting INTEGER DEFAULT 0,
     mortgage_debt REAL DEFAULT 0.0,
-    mortgage_payment REAL DEFAULT 0.0
+    mortgage_payment REAL DEFAULT 0.0,
+    transport_mode TEXT DEFAULT 'foot'
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
     id TEXT PRIMARY KEY,
     type TEXT,
     name TEXT,
-    capacity INTEGER
+    capacity INTEGER,
+    district_id TEXT DEFAULT NULL,
+    x REAL DEFAULT 0.0,
+    y REAL DEFAULT 0.0,
+    condition REAL DEFAULT 100.0
 );
 
 CREATE TABLE IF NOT EXISTS events (
@@ -292,6 +297,20 @@ class Database:
             if 'finished_goods' not in columns_ent:
                 cursor.execute("ALTER TABLE enterprises ADD COLUMN finished_goods REAL DEFAULT 20.0")
 
+            if 'transport_mode' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN transport_mode TEXT DEFAULT 'foot'")
+
+            cursor.execute("PRAGMA table_info(buildings)")
+            columns_b = [info[1] for info in cursor.fetchall()]
+            if 'district_id' not in columns_b:
+                cursor.execute("ALTER TABLE buildings ADD COLUMN district_id TEXT DEFAULT NULL")
+            if 'x' not in columns_b:
+                cursor.execute("ALTER TABLE buildings ADD COLUMN x REAL DEFAULT 0.0")
+            if 'y' not in columns_b:
+                cursor.execute("ALTER TABLE buildings ADD COLUMN y REAL DEFAULT 0.0")
+            if 'condition' not in columns_b:
+                cursor.execute("ALTER TABLE buildings ADD COLUMN condition REAL DEFAULT 100.0")
+
             cursor.execute("PRAGMA table_info(families)")
             columns_fam = [info[1] for info in cursor.fetchall()]
             if 'last_reproduction_check' not in columns_fam:
@@ -412,8 +431,8 @@ class Database:
             cursor.execute("DELETE FROM buildings")
             for b in buildings:
                 cursor.execute(
-                    "INSERT INTO buildings (id, type, name, capacity) VALUES (?, ?, ?, ?)",
-                    (b.id, b.b_type, b.name, b.capacity)
+                    "INSERT INTO buildings (id, type, name, capacity, district_id, x, y, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (b.id, b.b_type, b.name, b.capacity, getattr(b, 'district_id', None), getattr(b, 'x', 0.0), getattr(b, 'y', 0.0), getattr(b, 'condition', 100.0))
                 )
 
             # Сохраняем NPC
@@ -421,12 +440,8 @@ class Database:
             for npc in npcs:
                 cursor.execute(
                     """INSERT INTO npcs
-                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
-                    trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience,
-                    trait_ambition, trait_frugality, trait_diligence, health, family_id,
-                    date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id,
-                    hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -461,7 +476,8 @@ class Database:
                      getattr(npc, 'work_experience_days', 0),
                      1 if getattr(npc, 'is_renting', False) else 0,
                      getattr(npc, 'mortgage_debt', 0.0),
-                     getattr(npc, 'mortgage_payment', 0.0))
+                     getattr(npc, 'mortgage_payment', 0.0),
+                     getattr(npc, 'transport_mode', 'foot'))
                 )
 
             # Сохраняем семьи
