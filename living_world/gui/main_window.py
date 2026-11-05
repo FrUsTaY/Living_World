@@ -8,6 +8,11 @@ from living_world.population.generation import generate_initial_world
 from living_world.gui.tabs.population_tab import PopulationTab
 from living_world.gui.tabs.families_tab import FamiliesTab
 from living_world.gui.tabs.world_tab import WorldTab
+from living_world.gui.tabs.city_tab import CityTab
+from living_world.gui.tabs.stats_tab import StatsTab
+from living_world.gui.tabs.history_tab import HistoryTab
+from living_world.gui.tabs.events_tab import EventsTab
+from living_world.gui.tabs.settings_tab import SettingsTab
 from living_world.gui.dialogs.npc_card import NPCCardDialog
 from living_world.gui.dialogs.load_world import LoadWorldDialog
 from living_world.database.repository import Database
@@ -73,13 +78,23 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
 
         self.world_tab = WorldTab(self.sim, self)
-
         self.pop_tab = PopulationTab(self.sim, self)
+        self.fam_tab = FamiliesTab(self.sim, self)
+        self.city_tab = CityTab(self.sim, self)
+        self.stats_tab = StatsTab(self.sim, self)
+        self.history_tab = HistoryTab(self.sim, self)
+        self.events_tab = EventsTab(self.sim, self)
+        self.settings_tab = SettingsTab(self.sim, self)
 
         self.tabs.addTab(self.world_tab, "Мир")
         self.tabs.addTab(self.pop_tab, "Жители")
-        self.fam_tab = FamiliesTab(self.sim, self)
         self.tabs.addTab(self.fam_tab, "Семьи")
+        self.tabs.addTab(self.city_tab, "Город")
+        self.tabs.addTab(self.stats_tab, "Статистика")
+        self.tabs.addTab(self.history_tab, "История")
+        self.tabs.addTab(self.events_tab, "События")
+        self.tabs.addTab(self.settings_tab, "Настройки")
+        self.tabs.currentChanged.connect(self._on_tab_changed)
 
         main_layout.addWidget(self.tabs, stretch=3)
 
@@ -119,14 +134,16 @@ class MainWindow(QMainWindow):
 
             self.lbl_time.setText(self.sim.time.format_time())
 
-            if self.tabs.currentIndex() == 0:
-                self.world_tab.update_data()
-            elif self.tabs.currentIndex() == 1:
-                self.pop_tab.update_data()
-            elif self.tabs.currentIndex() == 2:
-                self.fam_tab.update_data()
+            current_tab = self.tabs.currentWidget()
+            if hasattr(current_tab, 'update_data'):
+                current_tab.update_data()
 
             self.update_log()
+
+    def _on_tab_changed(self, index):
+        widget = self.tabs.widget(index)
+        if hasattr(widget, 'update_data'):
+            widget.update_data()
 
     def update_log(self):
         self.log_list.clear()
@@ -142,12 +159,15 @@ class MainWindow(QMainWindow):
     def new_world(self):
         self.sim.close()
         self.sim = Simulation()
-        self.world_tab.simulation = self.sim
-        self.pop_tab.simulation = self.sim
-        self.fam_tab.simulation = self.sim
+        for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
+            tab.simulation = self.sim
+
         generate_initial_world(self.sim.city, self.sim, 25)
-        self.world_tab.update_data()
-        self.pop_tab.update_data()
+
+        for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
+            if hasattr(tab, 'update_data'):
+                tab.update_data()
+
         self.update_log()
         self.lbl_time.setText(self.sim.time.format_time())
         QMessageBox.information(self, "Новый мир", "Мир успешно создан!")
@@ -314,13 +334,12 @@ class MainWindow(QMainWindow):
                             if w_ent:
                                 w_ent.add_employee(n.id)
 
-                self.world_tab.simulation = self.sim
-                self.pop_tab.simulation = self.sim
-                self.fam_tab.simulation = self.sim
+                for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
+                    tab.simulation = self.sim
+                    if hasattr(tab, 'update_data'):
+                        tab.update_data()
 
                 self.lbl_time.setText(self.sim.time.format_time())
-                self.world_tab.update_data()
-                self.pop_tab.update_data()
                 self.update_log()
 
                 QMessageBox.information(self, "Загрузка", "Мир успешно загружен!")

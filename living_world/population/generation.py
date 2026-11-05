@@ -52,8 +52,8 @@ def generate_initial_world(city, simulation, num_npcs=25):
 
     generated_names = set()
 
-    for _ in range(num_npcs):
-        gender = random.choice(["М", "Ж"])
+    for i in range(num_npcs):
+        gender = "М" if i % 2 == 0 else "Ж"
 
         # Ensure unique full names
         attempts = 0
