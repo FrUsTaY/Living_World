@@ -438,7 +438,7 @@ class SocialManager:
         elif action_name == 'apology':
             comp = CompatibilityManager.calculate_compatibility(npc_a, npc_b)
             accept_chance = 0.75 + (npc_b.traits.get('empathy', 0) * 0.2) + (npc_a.traits.get('empathy', 0) * 0.1) + (comp * 0.1)
-            accept_chance = max(0.2, min(0.98, accept_chance))
+            accept_chance = max(0.2, min(1.0, accept_chance))
             if random.random() < accept_chance:
                 relief = 20.0 + (npc_a.traits.get('empathy', 0) * 5.0)
                 rel_mgr.modify_relationship(npc_a.id, npc_b.id, 'tension', -relief)

@@ -80,6 +80,9 @@ class EconomyManager:
         Деньги выплачиваются предприятием, на котором прикреплён житель.
         """
         hourly_wage = self.get_hourly_wage(npc.profession)
+        career_lvl = getattr(npc, 'career_level', 1)
+        wage_mult = 1.0 + (career_lvl - 1) * 0.25
+        hourly_wage *= wage_mult
         minute_rate = hourly_wage / 60.0
         earned = minute_rate * minutes
 
@@ -201,6 +204,8 @@ class EconomyManager:
                 if not already_owner and random.random() < 0.2:
                     self.found_private_business(npc)
 
+        self.process_labor_market()
+
     def found_private_business(self, npc) -> Optional[Enterprise]:
         investment = 40000.0
         if npc.money < investment:
@@ -263,3 +268,91 @@ class EconomyManager:
             "total_citizens_wealth": total_citizens_money,
             "average_wealth": avg_wealth,
         }
+
+    def process_labor_market(self):
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        import random
+
+        # 1. Накопление стажа и повышение квалификации (разряды 1-5)
+        for npc in self.simulation.npcs:
+            if not npc.is_alive or not npc.work_id or npc.profession in ["Безработный", "Пенсионер"]:
+                continue
+
+            if not getattr(npc, 'is_sick', False):
+                npc.work_experience_days = getattr(npc, 'work_experience_days', 0) + 1
+
+                cur_lvl = getattr(npc, 'career_level', 1)
+                if cur_lvl < 5:
+                    exp = npc.work_experience_days
+                    diligence = npc.traits.get('diligence', 0.0) if hasattr(npc, 'traits') else 0.0
+                    thresholds = {1: 25, 2: 75, 3: 180, 4: 360}
+                    req_days = thresholds.get(cur_lvl, 999)
+                    if diligence > 0.3:
+                        req_days = int(req_days * 0.8)
+
+                    if exp >= req_days:
+                        npc.career_level = cur_lvl + 1
+                        npc.mood = min(100.0, npc.mood + 15.0)
+                        if hasattr(self.simulation, 'event_aggregator'):
+                            self.simulation.event_aggregator.publish_event(
+                                event_type=EventType.JOB_CHANGE,
+                                importance=EventImportance.MEDIUM,
+                                message=f"🎖 Повышение квалификации: {npc.get_full_name()} получил(а) {npc.career_level}-й разряд в профессии '{npc.profession}'!",
+                                participants=[npc.id]
+                            )
+                        if hasattr(self.simulation, 'memory_manager'):
+                            self.simulation.memory_manager.add_memory(
+                                npc.id, None, "Повышение", f"Присвоен {npc.career_level}-й квалификационный разряд", 0.7, 0.8
+                            )
+
+        # 2. Сокращение штата убыточными предприятиями
+        for ent in list(self.enterprises.values()):
+            if ent.is_active and ent.budget < -15000.0 and len(ent.employees) > 1:
+                emp_npcs = [n for n in self.simulation.npcs if n.id in ent.employees and n.is_alive]
+                if emp_npcs:
+                    victim = min(emp_npcs, key=lambda n: getattr(n, 'work_experience_days', 0))
+                    ent.remove_employee(victim.id)
+                    victim.work_id = None
+                    victim.profession = "Безработный"
+                    victim.mood = max(0.0, victim.mood - 25.0)
+                    if hasattr(self.simulation, 'event_aggregator'):
+                        self.simulation.event_aggregator.publish_event(
+                            event_type=EventType.JOB_CHANGE,
+                            importance=EventImportance.HIGH,
+                            message=f"📉 Сокращение штата: {victim.get_full_name()} уволен(а) из {ent.name} из-за убытков предприятия.",
+                            participants=[victim.id]
+                        )
+
+        # 3. Биржа труда: наем безработных на предприятия с открытыми вакансиями
+        current_date = self.simulation.time.current_datetime
+        unemployed = [
+            n for n in self.simulation.npcs
+            if n.is_alive and (n.profession == "Безработный" or not n.work_id) and 18 <= n.get_age(current_date) < 65
+        ]
+
+        if unemployed:
+            active_enterprises = [e for e in self.enterprises.values() if e.is_active and e.budget >= 0.0]
+            for ent in active_enterprises:
+                max_cap = 5
+                if len(ent.employees) < max_cap and unemployed:
+                    candidate = unemployed.pop(0)
+                    candidate.work_id = ent.building_id
+                    ent.add_employee(candidate.id)
+                    prof_map = {
+                        'farm': 'Фермер',
+                        'workshop': 'Механик',
+                        'construction': 'Строитель',
+                        'shop': 'Продавец',
+                        'cafe': 'Повар',
+                        'hospital': 'Врач',
+                        'school': 'Учитель'
+                    }
+                    candidate.profession = prof_map.get(ent.enterprise_type, 'Разнорабочий')
+                    candidate.career_level = 1
+                    if hasattr(self.simulation, 'event_aggregator'):
+                        self.simulation.event_aggregator.publish_event(
+                            event_type=EventType.JOB_CHANGE,
+                            importance=EventImportance.LOW,
+                            message=f"💼 Биржа труда: {candidate.get_full_name()} принят(а) в {ent.name} на должность '{candidate.profession}'.",
+                            participants=[candidate.id]
+                        )

@@ -9,7 +9,8 @@ class NPC:
 
     def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id,
                  npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None, health=100.0,
-                 hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0, alimony_to_id=None):
+                 hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0, alimony_to_id=None,
+                 career_level=1, work_experience_days=0):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -46,6 +47,8 @@ class NPC:
         self.current_education_id = None
         self.education_status = None
         self.alimony_to_id = alimony_to_id
+        self.career_level = int(career_level)
+        self.work_experience_days = int(work_experience_days)
 
         self.hygiene = float(hygiene)
         self.stress = float(stress)
@@ -127,6 +130,7 @@ class NPC:
             "Жизненный этап": stage,
             "Статус": "Жив" if self.is_alive else "Умер",
             "Профессия": self.profession,
+            "Квалификация": f"{self.career_level} разряд ({self.work_experience_days} дн. стажа)",
             "Деньги": f"{self.money:.2f} ₽",
             "Здоровье": f"{int(self.health)}%" if not self.is_sick else f"{int(self.health)}% (Болен)",
             "Гигиена": f"{int(self.hygiene)}%",

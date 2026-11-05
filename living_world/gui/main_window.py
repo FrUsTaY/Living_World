@@ -266,6 +266,8 @@ class MainWindow(QMainWindow):
                     npc.is_sick = bool(nd.get('is_sick', 0))
                     npc.sick_days = int(nd.get('sick_days', 0))
                     npc.alimony_to_id = nd.get('alimony_to_id')
+                    npc.career_level = int(nd.get('career_level', 1))
+                    npc.work_experience_days = int(nd.get('work_experience_days', 0))
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']

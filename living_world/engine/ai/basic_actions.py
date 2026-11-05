@@ -100,9 +100,20 @@ class WorkAction(Action):
         return npc.work_id is not None
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
+        if getattr(npc, 'is_sick', False):
+            return 0.0  # Больничный
+
         hour = time_dict['hour']
         is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
         weekday = time_dict.get('weekday', simulation.time.weekday if hasattr(simulation, 'time') else 0)
+
+        # Очная учеба блокирует дневную работу
+        prog_id = getattr(npc, 'current_education_id', None)
+        if prog_id:
+            prog = simulation.education_manager.programs.get(prog_id)
+            if prog and prog.type in ["school_9", "school_11", "bachelor", "college"]:
+                if 8 <= hour < 15:
+                    return 0.0
 
         # Сменные профессии (Врач, Продавец) дежурят и в выходные дни
         is_shift_worker = npc.profession in ["Врач", "Продавец"]
@@ -120,14 +131,6 @@ class WorkAction(Action):
                     return 35.0
                 # В воскресенье и для остальных в субботу — выходной
                 return 0.0
-
-        # Будние дни:
-        prog_id = getattr(npc, 'current_education_id', None)
-        if prog_id:
-            prog = simulation.education_manager.programs.get(prog_id)
-            if prog and prog.type in ["school_9", "school_11", "bachelor", "college"]:
-                if 8 <= hour < 15:
-                    return 0.0 # Очная учеба блокирует работу днем
 
         utility = 0.0
         if 8 <= hour < 17:
