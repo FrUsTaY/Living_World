@@ -253,6 +253,7 @@ class MainWindow(QMainWindow):
                     npc.hunger = nd['hunger']
                     npc.energy = nd['energy']
                     npc.mood = nd['mood']
+                    npc.health = float(nd.get('health', 100.0))
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']
@@ -264,7 +265,10 @@ class MainWindow(QMainWindow):
                         'conflict': nd.get('trait_conflict', 0.0),
                         'empathy': nd.get('trait_empathy', 0.0),
                         'boldness': nd.get('trait_boldness', 0.0),
-                        'patience': nd.get('trait_patience', 0.0)
+                        'patience': nd.get('trait_patience', 0.0),
+                        'ambition': nd.get('trait_ambition', 0.0),
+                        'frugality': nd.get('trait_frugality', 0.0),
+                        'diligence': nd.get('trait_diligence', 0.0)
                     }
 
                     self.sim.add_npc(npc)

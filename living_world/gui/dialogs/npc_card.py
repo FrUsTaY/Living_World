@@ -126,7 +126,10 @@ class NPCCardDialog(QDialog):
             'conflict': 'Конфликтность',
             'empathy': 'Эмпатия',
             'boldness': 'Смелость',
-            'patience': 'Терпение'
+            'patience': 'Терпение',
+            'ambition': 'Амбициозность',
+            'frugality': 'Бережливость',
+            'diligence': 'Трудолюбие'
         }
 
         for key, name in traits_map.items():

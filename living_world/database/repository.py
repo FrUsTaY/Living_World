@@ -30,6 +30,10 @@ CREATE TABLE IF NOT EXISTS npcs (
     trait_empathy REAL,
     trait_boldness REAL,
     trait_patience REAL,
+    trait_ambition REAL DEFAULT 0.0,
+    trait_frugality REAL DEFAULT 0.0,
+    trait_diligence REAL DEFAULT 0.0,
+    health REAL DEFAULT 100.0,
     family_id TEXT,
     date_of_birth TEXT,
     date_of_death TEXT,
@@ -234,6 +238,14 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN father_id TEXT")
             if 'children_desire' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN children_desire REAL DEFAULT 0.5")
+            if 'health' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN health REAL DEFAULT 100.0")
+            if 'trait_ambition' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN trait_ambition REAL DEFAULT 0.0")
+            if 'trait_frugality' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN trait_frugality REAL DEFAULT 0.0")
+            if 'trait_diligence' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN trait_diligence REAL DEFAULT 0.0")
 
             cursor.execute("PRAGMA table_info(families)")
             columns_fam = [info[1] for info in cursor.fetchall()]
@@ -363,9 +375,10 @@ class Database:
                 cursor.execute(
                     """INSERT INTO npcs
                     (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
-                    trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, family_id,
+                    trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience,
+                    trait_ambition, trait_frugality, trait_diligence, health, family_id,
                     date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -374,6 +387,10 @@ class Database:
                      npc.traits.get('empathy', 0.0) if hasattr(npc, 'traits') else 0.0,
                      npc.traits.get('boldness', 0.0) if hasattr(npc, 'traits') else 0.0,
                      npc.traits.get('patience', 0.0) if hasattr(npc, 'traits') else 0.0,
+                     npc.traits.get('ambition', 0.0) if hasattr(npc, 'traits') else 0.0,
+                     npc.traits.get('frugality', 0.0) if hasattr(npc, 'traits') else 0.0,
+                     npc.traits.get('diligence', 0.0) if hasattr(npc, 'traits') else 0.0,
+                     getattr(npc, 'health', 100.0),
                      npc.family_id if hasattr(npc, 'family_id') else None,
                      npc.date_of_birth.isoformat() if npc.date_of_birth else None,
                      npc.date_of_death.isoformat() if getattr(npc, 'date_of_death', None) else None,

@@ -5,7 +5,8 @@ from living_world.engine.event_bus import bus
 from living_world.engine.life_cycle_manager import LifeCycleManager, LifeStage
 
 class NPC:
-    def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id, npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None):
+    def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id,
+                 npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None, health=100.0):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -26,6 +27,7 @@ class NPC:
         self.hunger = 100.0   # 100 = сыт
         self.energy = 100.0   # 100 = полон сил
         self.mood = 100.0     # 100 = счастлив
+        self.health = float(health) # 100 = идеально здоров
 
         self.current_location = home_id
         self.state = "Спит"
@@ -73,7 +75,10 @@ class NPC:
             'conflict': random.uniform(-1.0, 1.0),
             'empathy': random.uniform(-1.0, 1.0),
             'boldness': random.uniform(-1.0, 1.0),
-            'patience': random.uniform(-1.0, 1.0)
+            'patience': random.uniform(-1.0, 1.0),
+            'ambition': random.uniform(-1.0, 1.0),
+            'frugality': random.uniform(-1.0, 1.0),
+            'diligence': random.uniform(-1.0, 1.0)
         }
 
     def get_full_name(self):
@@ -112,6 +117,7 @@ class NPC:
             "Статус": "Жив" if self.is_alive else "Умер",
             "Профессия": self.profession,
             "Деньги": f"{self.money:.2f} ₽",
+            "Здоровье": f"{int(self.health)}%",
             "Настроение": f"{int(self.mood)}%",
             "Энергия": f"{int(self.energy)}%",
             "Голод": f"{int(self.hunger)}%",

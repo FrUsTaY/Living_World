@@ -4,6 +4,11 @@ class TimeManager:
     # Base starting date for the world
     START_DATE = datetime(2000, 1, 1, 8, 0, 0)
 
+    WEEKDAYS_RU = [
+        "Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"
+    ]
+    WEEKDAYS_SHORT_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"]
+
     def __init__(self):
         self.current_datetime = self.START_DATE
         self.speed = 1  # 1x, 10x, 100x, 1000x
@@ -38,11 +43,43 @@ class TimeManager:
             "month": self.current_datetime.month,
             "day": self.current_datetime.day,
             "hour": self.current_datetime.hour,
-            "minute": self.current_datetime.minute
+            "minute": self.current_datetime.minute,
+            "weekday": self.weekday,
+            "is_weekend": self.is_weekend
         }
 
+    @property
+    def weekday(self) -> int:
+        """0 = Monday, 6 = Sunday"""
+        return self.current_datetime.weekday()
+
+    @property
+    def is_weekend(self) -> bool:
+        """True if Saturday (5) or Sunday (6)"""
+        return self.weekday in (5, 6)
+
+    @property
+    def weekday_name(self) -> str:
+        return self.WEEKDAYS_RU[self.weekday]
+
+    @property
+    def weekday_short(self) -> str:
+        return self.WEEKDAYS_SHORT_RU[self.weekday]
+
+    @property
+    def season_name(self) -> str:
+        m = self.current_datetime.month
+        if m in (12, 1, 2):
+            return "Зима"
+        elif m in (3, 4, 5):
+            return "Весна"
+        elif m in (6, 7, 8):
+            return "Лето"
+        else:
+            return "Осень"
+
     def format_time(self):
-        return self.current_datetime.strftime("%d.%m.%Y · %H:%M")
+        return f"{self.current_datetime.strftime('%d.%m.%Y')} ({self.weekday_short}) · {self.current_datetime.strftime('%H:%M')}"
 
     def format_date(self):
         return self.current_datetime.strftime("%d.%m.%Y")

@@ -31,9 +31,9 @@ class PopulationTab(QWidget):
         self.layout.addLayout(top_layout)
 
         self.table = QTableWidget()
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels([
-            "Имя", "Возраст", "Профессия", "Район", "Деньги", "Настроение", "Статус"
+            "Имя", "Возраст", "Профессия", "Район", "Деньги", "Здоровье", "Настроение", "Статус"
         ])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
@@ -97,19 +97,27 @@ class PopulationTab(QWidget):
                 money_item.setForeground(Qt.gray)
             self.table.setItem(row, 4, money_item)
 
-            # 5. Настроение
+            # 5. Здоровье
+            health_val = getattr(npc, 'health', 100.0)
+            health_str = f"{int(health_val)}%" if npc.is_alive else "—"
+            health_item = QTableWidgetItem(health_str)
+            if not npc.is_alive:
+                health_item.setForeground(Qt.gray)
+            self.table.setItem(row, 5, health_item)
+
+            # 6. Настроение
             mood_str = f"{int(npc.mood)}%" if npc.is_alive else "—"
             mood_item = QTableWidgetItem(mood_str)
             if not npc.is_alive:
                 mood_item.setForeground(Qt.gray)
-            self.table.setItem(row, 5, mood_item)
+            self.table.setItem(row, 6, mood_item)
 
-            # 6. Статус
+            # 7. Статус
             status = npc.state if npc.is_alive else "Умер"
             state_item = QTableWidgetItem(status)
             if not npc.is_alive:
                 state_item.setForeground(Qt.gray)
-            self.table.setItem(row, 6, state_item)
+            self.table.setItem(row, 7, state_item)
 
     def on_item_double_clicked(self, item):
         row = item.row()

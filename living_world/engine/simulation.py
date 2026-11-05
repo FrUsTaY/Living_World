@@ -141,12 +141,18 @@ class Simulation:
 
                 if is_new_day:
                     self.education_manager.update_npc_education(npc, time_dict)
-                # 1. Изменение базовых потребностей
+                # 1. Изменение базовых потребностей и здоровья
                 npc.hunger -= 0.1
                 npc.energy -= 0.05
-                npc.hunger = max(0, min(100, npc.hunger))
-                npc.energy = max(0, min(100, npc.energy))
-                npc.mood = (npc.hunger + npc.energy) / 2
+                npc.hunger = max(0.0, min(100.0, npc.hunger))
+                npc.energy = max(0.0, min(100.0, npc.energy))
+
+                if npc.hunger <= 0.0 or npc.energy <= 0.0:
+                    npc.health = max(0.0, getattr(npc, 'health', 100.0) - 0.1)
+
+                bio_baseline = (npc.hunger + npc.energy) / 2.0
+                current_mood = getattr(npc, 'mood', 100.0)
+                npc.mood = max(0.0, min(100.0, current_mood * 0.96 + bio_baseline * 0.04))
 
                 # 2. Выбор и выполнение действия через Utility AI
                 self.ai_controller.choose_and_execute_action(npc, time_dict)

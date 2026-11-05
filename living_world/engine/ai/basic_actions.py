@@ -28,12 +28,18 @@ class SleepAction(Action):
             if npc.energy < 30:
                 utility += 50
         elif npc.energy < 20:
-             utility += 50
+            utility += 50
+
+        # При плохом самочувствии (болезнь/истощение) возрастает потребность в сне
+        if getattr(npc, 'health', 100.0) < 40:
+            utility += 60
 
         return utility
 
     def execute(self, npc, simulation, time_dict):
         npc.energy += 0.3
+        if npc.energy >= 60 and npc.hunger >= 30:
+            npc.health = min(100.0, getattr(npc, 'health', 100.0) + 0.1)
         if npc.current_location != npc.home_id:
              npc.current_location = npc.home_id
 
@@ -63,6 +69,8 @@ class EatAction(Action):
 
     def execute(self, npc, simulation, time_dict):
         npc.hunger += 2.0
+        if npc.hunger >= 60:
+            npc.health = min(100.0, getattr(npc, 'health', 100.0) + 0.05)
         if npc.current_location != npc.home_id:
              npc.current_location = npc.home_id
         if getattr(npc, '_last_state', None) != self.name and hasattr(simulation, 'economy_manager'):
@@ -83,8 +91,27 @@ class WorkAction(Action):
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         hour = time_dict['hour']
-        utility = 0.0
+        is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
+        weekday = time_dict.get('weekday', simulation.time.weekday if hasattr(simulation, 'time') else 0)
 
+        # Сменные профессии (Врач, Продавец) дежурят и в выходные дни
+        is_shift_worker = npc.profession in ["Врач", "Продавец"]
+
+        if is_weekend:
+            if is_shift_worker:
+                # Врач или продавец выходят на дежурство в субботу или днем в воскресенье
+                if 9 <= hour < 16:
+                    return 85.0
+                return 0.0
+            else:
+                # В субботу только сверхурочные у трудоголиков
+                diligence = npc.traits.get('diligence', 0.0)
+                if weekday == 5 and diligence > 0.6 and 9 <= hour < 13:
+                    return 35.0
+                # В воскресенье и для остальных в субботу — выходной
+                return 0.0
+
+        # Будние дни:
         prog_id = getattr(npc, 'current_education_id', None)
         if prog_id:
             prog = simulation.education_manager.programs.get(prog_id)
@@ -92,6 +119,7 @@ class WorkAction(Action):
                 if 8 <= hour < 15:
                     return 0.0 # Очная учеба блокирует работу днем
 
+        utility = 0.0
         if 8 <= hour < 17:
             life_stage = npc.get_life_stage(simulation.time.current_datetime)
             if life_stage in [LifeStage.YOUNG_ADULT, LifeStage.ADULT]:
@@ -130,19 +158,27 @@ class RelaxAction(Action):
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         utility = 0.0
         hour = time_dict['hour']
+        is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
 
         if npc.mood < 30:
             utility += 40
 
+        if getattr(npc, 'health', 100.0) < 50:
+            utility += 45
+
         if 17 <= hour < 22 or 7 <= hour < 8:
              utility += 35
+        elif is_weekend and 9 <= hour < 14:
+             utility += 40
 
         return utility
 
     def execute(self, npc, simulation, time_dict):
         if npc.current_location != npc.home_id:
              npc.current_location = npc.home_id
-        npc.mood += 1.0
+        npc.mood = min(100.0, npc.mood + 1.0)
+        if getattr(npc, 'health', 100.0) < 90:
+            npc.health = min(100.0, getattr(npc, 'health', 100.0) + 0.05)
 
 class PlayAction(Action):
     @property
@@ -156,18 +192,21 @@ class PlayAction(Action):
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         utility = 0.0
         hour = time_dict['hour']
+        is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
         life_stage = npc.get_life_stage(simulation.time.current_datetime)
 
         if 9 <= hour < 21:
              if life_stage in [LifeStage.BABY, LifeStage.CHILD, LifeStage.SCHOOL]:
                  utility += 70
+                 if is_weekend:
+                     utility += 25
 
         return utility
 
     def execute(self, npc, simulation, time_dict):
         if npc.current_location != npc.home_id:
              npc.current_location = npc.home_id
-        npc.mood += 1.5
+        npc.mood = min(100.0, npc.mood + 1.5)
 
 class SocializeAction(Action):
     @property
@@ -184,9 +223,12 @@ class SocializeAction(Action):
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         utility = 0.0
         hour = time_dict['hour']
+        is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
 
         if 11 <= hour < 22:
             utility += 50 + (npc.traits.get("sociability", 0) * 15)
+            if is_weekend:
+                utility += 45 # На выходных горожане активно социализируются
             if getattr(npc, 'dating_partner_id', None):
                 utility += 15
             if npc.mood < 60:
@@ -202,7 +244,7 @@ class SocializeAction(Action):
             target = random.choice(places).id
             if npc.current_location != target:
                 npc.current_location = target
-        npc.mood += 1.2
+        npc.mood = min(100.0, npc.mood + 1.2)
 
 class StudyAction(Action):
     @property
@@ -215,6 +257,15 @@ class StudyAction(Action):
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         hour = time_dict['hour']
         utility = 0.0
+        weekday = time_dict.get('weekday', simulation.time.weekday if hasattr(simulation, 'time') else 0)
+
+        # В воскресенье учебные заведения закрыты
+        if weekday == 6:
+            return 0.0
+
+        # В субботу во второй половине дня учебные заведения закрыты
+        if weekday == 5 and hour >= 13:
+            return 0.0
 
         prog_id = getattr(npc, 'current_education_id', None)
         is_full_time = False
@@ -232,7 +283,7 @@ class StudyAction(Action):
                 utility += 70
 
         # Домашнее задание
-        if 16 <= hour < 19 and is_full_time:
+        if 16 <= hour < 19 and is_full_time and weekday < 5:
             patience = npc.traits.get('patience', 0)
             if patience > 0:
                 utility += 40
@@ -266,9 +317,12 @@ class StrollAction(Action):
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         hour = time_dict['hour']
+        is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
         utility = 0.0
-        if 17 <= hour < 22 or 7 <= hour < 9:
+        if 17 <= hour < 22 or 7 <= hour < 9 or (is_weekend and 10 <= hour < 21):
             utility += 48 + (npc.traits.get('sociability', 0) * 10) + (npc.traits.get('boldness', 0) * 5)
+            if is_weekend:
+                utility += 15
             if npc.mood < 50:
                 utility += 15
         return utility
@@ -280,7 +334,7 @@ class StrollAction(Action):
             if npc.current_location != target:
                 npc.current_location = target
         npc.energy -= 0.05
-        npc.mood += 1.0
+        npc.mood = min(100.0, npc.mood + 1.0)
 
 class DateAction(Action):
     @property
@@ -297,11 +351,14 @@ class DateAction(Action):
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         hour = time_dict['hour']
+        is_weekend = time_dict.get('is_weekend', simulation.time.is_weekend if hasattr(simulation, 'time') else False)
         utility = 0.0
         partner_id = getattr(npc, 'dating_partner_id', None)
-        if partner_id and (17 <= hour < 22):
+        if partner_id and ((17 <= hour < 22) or (is_weekend and 12 <= hour < 22)):
             rel = simulation.relationship_manager.get_relationship(npc.id, partner_id)
             utility += 60 + (rel.get('romantic_interest', 0) * 0.2)
+            if is_weekend:
+                utility += 30
         return utility
 
     def execute(self, npc, simulation, time_dict):
@@ -321,5 +378,5 @@ class DateAction(Action):
 
         if npc.current_location != target:
             npc.current_location = target
-        npc.mood += 2.0
+        npc.mood = min(100.0, npc.mood + 2.0)
         npc.energy -= 0.05
