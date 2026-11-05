@@ -150,7 +150,8 @@ class Database:
         self._init_db()
 
     def _init_db(self):
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.executescript(SCHEMA)
             cursor = conn.cursor()
 
@@ -283,6 +284,9 @@ class Database:
                         cursor.execute("INSERT INTO households (id, home_id, creation_time) VALUES (?, ?, ?)", (hh_id, home_id, current_time))
                     hh_id = home_households[home_id]
                     cursor.execute("UPDATE npcs SET household_id = ? WHERE id = ?", (hh_id, npc_id))
+            conn.commit()
+        finally:
+            conn.close()
 
     def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None):
         if memories is None: memories = []
@@ -296,7 +300,8 @@ class Database:
         if world_events is None: world_events = []
         if enterprises is None: enterprises = []
 
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             cursor = conn.cursor()
 
             # Сохраняем мету (время)
@@ -453,9 +458,13 @@ class Database:
                         "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                         (ent.id, ent.name, ent.enterprise_type, ent.building_id, ent.owner_id, ent.budget, ent.wage_rate, 1 if ent.is_active else 0)
                     )
+            conn.commit()
+        finally:
+            conn.close()
 
     def load_world(self):
-        with sqlite3.connect(self.db_path) as conn:
+        conn = sqlite3.connect(self.db_path)
+        try:
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
 
@@ -518,3 +527,5 @@ class Database:
                 pass
 
             return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises
+        finally:
+            conn.close()

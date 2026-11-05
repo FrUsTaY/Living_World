@@ -11,6 +11,7 @@ from living_world.engine.ai.ai_controller import AIController
 from living_world.engine.education.manager import EducationManager
 from living_world.engine.reproduction.manager import ReproductionManager
 from living_world.engine.economy.economy_manager import EconomyManager
+from living_world.engine.autosave_manager import AutosaveManager
 from living_world.engine.observer.event_journal import EventJournal
 from living_world.engine.observer.event_aggregator import EventAggregator
 from living_world.engine.observer.world_event import EventType, EventImportance
@@ -37,6 +38,7 @@ class Simulation:
         self.education_manager = EducationManager(self)
         self.reproduction_manager = ReproductionManager(self)
         self.economy_manager = EconomyManager(self)
+        self.autosave_manager = AutosaveManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -57,6 +59,31 @@ class Simulation:
         self.full_history.append(event)
         if len(self.events_log) > 200:
             self.events_log.pop(0)
+
+    def save_to_file(self, file_path: str):
+        from living_world.database.repository import Database
+        edu_inst = getattr(self, 'education_manager', None)
+        households = list(self.household_manager.households.values()) if hasattr(self, 'household_manager') else []
+        pregnancies = getattr(self, 'reproduction_manager', None).active_pregnancies if hasattr(self, 'reproduction_manager') else []
+        enterprises = list(self.economy_manager.enterprises.values()) if hasattr(self, 'economy_manager') else []
+
+        db = Database(file_path)
+        db.save_world(
+            sim_time=self.time.get_time_dict(),
+            npcs=self.npcs,
+            buildings=self.city.buildings,
+            events=self.full_history,
+            families=getattr(self, 'families', []),
+            relationships=self.relationship_manager.get_all_relationships(),
+            memories=self.memory_manager.get_all_memories(),
+            educational_institutions=list(edu_inst.institutions.values()) if edu_inst else [],
+            education_programs=list(edu_inst.programs.values()) if edu_inst else [],
+            education_history=[r.to_dict() for r in getattr(edu_inst, 'history', [])] if edu_inst else [],
+            pregnancies=pregnancies,
+            households=households,
+            world_events=self.event_journal.to_dicts(),
+            enterprises=enterprises
+        )
 
     def add_npc(self, npc):
         self.npcs.append(npc)
@@ -103,6 +130,7 @@ class Simulation:
             if is_new_day:
                 self.reproduction_manager.update()
                 self.economy_manager.daily_cycle()
+                self.autosave_manager.check_and_autosave(time_dict['day'])
 
             for npc in self.npcs:
                 if not npc.is_alive:

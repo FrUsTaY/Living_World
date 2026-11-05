@@ -176,26 +176,8 @@ class MainWindow(QMainWindow):
         name, ok = QInputDialog.getText(self, "Сохранение мира", "Введите имя сохранения:")
         if ok and name:
             file_path = os.path.join(self.saves_dir, name + ".db")
-            db = Database(file_path)
             try:
-                edu_inst = getattr(self.sim, 'education_manager', None)
-                households_to_save = list(self.sim.household_manager.households.values()) if hasattr(self.sim, 'household_manager') else []
-                db.save_world(
-                    self.sim.time.get_time_dict(),
-                    self.sim.npcs,
-                    self.sim.city.buildings,
-                    self.sim.full_history,
-                    getattr(self.sim, 'families', []),
-                    self.sim.relationship_manager.get_all_relationships(),
-                    self.sim.memory_manager.get_all_memories(),
-                    list(edu_inst.institutions.values()) if edu_inst else [],
-                    list(edu_inst.programs.values()) if edu_inst else [],
-                    [r.to_dict() for r in getattr(edu_inst, 'history', [])] if edu_inst else [],
-                    getattr(self.sim, 'reproduction_manager', None).active_pregnancies if hasattr(self.sim, 'reproduction_manager') else [],
-                    households_to_save,
-                    self.sim.event_journal.to_dicts(),
-                    list(self.sim.economy_manager.enterprises.values()) if hasattr(self.sim, 'economy_manager') else []
-                )
+                self.sim.save_to_file(file_path)
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
                 QMessageBox.critical(self, "Ошибка", f"Ошибка сохранения: {e}")
