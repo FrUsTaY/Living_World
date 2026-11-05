@@ -41,12 +41,10 @@ def test_evaluate_city_growth_triggers_home_project():
     generate_initial_world(sim.city, sim, 20)
 
     cm = sim.construction_manager
-    # Initially we have 10 homes * 4 = 40 capacity for 20 npcs. Plenty of room.
     assert len(cm.active_projects) == 0
 
     # Fill homes to create artificial housing deficit
     homes = sim.city.get_homes()
-    # Add fake NPCs to exceed 85% occupancy
     for i in range(16):
         dummy = NPC(f"Test{i}", "Fake", datetime(1990, 1, 1), "М", "Разнорабочий", homes[0].id, "work")
         sim.add_npc(dummy)
@@ -55,10 +53,9 @@ def test_evaluate_city_growth_triggers_home_project():
     cm.evaluate_city_growth()
 
     # A home project should be initiated!
-    assert len(cm.active_projects) == 1
-    proj = cm.active_projects[0]
-    assert proj.building_type == "home"
-    assert "Дом" in proj.name
+    assert len(cm.active_projects) >= 1
+    home_projs = [p for p in cm.active_projects if p.building_type == "home"]
+    assert len(home_projs) >= 1
 
 def test_advance_and_finalize_construction():
     sim = Simulation()
@@ -104,4 +101,28 @@ def test_district_expansion():
     # Now ask for a target district
     new_d = cm.get_or_create_target_district()
     assert len(sim.city.districts) == initial_districts_cnt + 1
-    assert "Жилой район" in new_d.name
+    assert "район" in new_d.name.lower() or "массив" in new_d.name.lower()
+
+def test_order_private_home():
+    sim = Simulation()
+    generate_initial_world(sim.city, sim, 20)
+    cm = sim.construction_manager
+
+    wealthy = NPC("Григорий", "Романов", datetime(1985, 1, 1), "М", "Инженер", "home_1", "work_1")
+    wealthy.money = 70000.0
+    sim.add_npc(wealthy)
+
+    proj = cm.order_private_home(wealthy, house_name="Усадьба Романовых")
+    assert proj is not None
+    assert proj.commissioner_id == wealthy.id
+    assert wealthy.money == 35000.0
+    assert proj in cm.active_projects
+
+    builder = next(n for n in sim.npcs if n.profession == "Строитель")
+    while not proj.is_completed:
+        cm.advance_construction(builder, minutes=100.0)
+
+    # Commissioner moves in!
+    b = next((b for b in sim.city.buildings if b.name == "Усадьба Романовых"), None)
+    assert b is not None
+    assert wealthy.home_id == b.id

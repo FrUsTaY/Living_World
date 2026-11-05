@@ -20,8 +20,10 @@ class ConstructionProject:
         project_id: Optional[str] = None,
         progress: float = 0.0,
         cost: float = 30000.0,
-        is_completed: bool = False
+        is_completed: bool = False,
+        commissioner_id: Optional[str] = None
     ):
+        self.commissioner_id = commissioner_id
         self.id = project_id or str(uuid.uuid4())
         self.name = name
         self.building_type = building_type  # 'home', 'work'
@@ -50,7 +52,8 @@ class ConstructionProject:
             "district_id": self.district_id,
             "progress": self.progress,
             "cost": self.cost,
-            "is_completed": self.is_completed
+            "is_completed": self.is_completed,
+            "commissioner_id": self.commissioner_id
         }
 
     @classmethod
@@ -64,7 +67,8 @@ class ConstructionProject:
             project_id=data["id"],
             progress=data.get("progress", 0.0),
             cost=data.get("cost", 30000.0),
-            is_completed=data.get("is_completed", False)
+            is_completed=data.get("is_completed", False),
+            commissioner_id=data.get("commissioner_id")
         )
 
 
@@ -97,8 +101,13 @@ class ConstructionManager:
                 return d
 
         # Если все районы заполнены — основываем новый район!
-        idx = len(city.districts) + 1
-        new_district = District(f"Жилой район №{idx}", "residential")
+        names_pool = [
+            "Заречный район", "Северный жилой массив", "Зеленый квартал",
+            "Южный пригород", "Восточный квартал", "Парковый район", "Солнечный микрорайон"
+        ]
+        idx = len(city.districts) - 1
+        d_name = names_pool[idx % len(names_pool)] if idx >= 0 else "Новый район"
+        new_district = District(d_name, "residential")
         city.add_district(new_district)
 
         self.simulation.event_aggregator.publish_event(
@@ -179,6 +188,66 @@ class ConstructionManager:
                 participants=[]
             )
 
+        # 3. Муниципальные инвестиции города в общественную инфраструктуру
+        econ = getattr(self.simulation, "economy_manager", None)
+        if econ and econ.city_treasury >= 120000.0 and total_pop >= 25 and not any(p.building_type == "park" for p in self.active_projects):
+            parks_cnt = len(city.get_places_by_type("park"))
+            districts_cnt = len(city.districts)
+            if parks_cnt < districts_cnt:
+                district = self.get_or_create_target_district()
+                park_cost = 30000.0
+                econ.city_treasury -= park_cost
+                project = ConstructionProject(
+                    name=f"Сквер '{district.name}'",
+                    building_type="park",
+                    target_capacity=25,
+                    district_id=district.id,
+                    cost=park_cost
+                )
+                self.active_projects.append(project)
+                self.simulation.event_aggregator.publish_event(
+                    event_type=EventType.ECONOMIC,
+                    importance=EventImportance.HIGH,
+                    message=f"🏛 Муниципалитет выделил {park_cost:,.0f} ₽ на благоустройство нового сквера в районе '{district.name}'!",
+                    participants=[]
+                )
+
+        # 4. Частные заказы на строительство домов от зажиточных горожан
+        for npc in alive_npcs:
+            if npc.money >= 60000.0:
+                current_home_occupants = sum(1 for n in alive_npcs if n.home_id == npc.home_id)
+                if current_home_occupants >= 3 or getattr(npc, 'family_id', None) is not None:
+                    already_commissioned = any(p.commissioner_id == npc.id for p in self.active_projects)
+                    if not already_commissioned and random.random() < 0.2:
+                        self.order_private_home(npc)
+
+    def order_private_home(self, npc, house_name: Optional[str] = None) -> Optional[ConstructionProject]:
+        cost = 35000.0
+        if npc.money < cost:
+            return None
+
+        npc.money -= cost
+        district = self.get_or_create_target_district()
+        final_name = house_name or f"Усадьба {npc.last_name}"
+
+        project = ConstructionProject(
+            name=final_name,
+            building_type="home",
+            target_capacity=5,
+            district_id=district.id,
+            cost=cost,
+            commissioner_id=npc.id
+        )
+        self.active_projects.append(project)
+
+        self.simulation.event_aggregator.publish_event(
+            event_type=EventType.ECONOMIC,
+            importance=EventImportance.HIGH,
+            message=f"🏡 {npc.get_full_name()} профинансировал(а) строительство семейного дома '{project.name}' ({district.name}).",
+            participants=[npc.id]
+        )
+        return project
+
     def advance_construction(self, builder_npc, minutes: float = 1.0) -> Optional[ConstructionProject]:
         """
         Строитель трудится на стройплощадке.
@@ -217,11 +286,36 @@ class ConstructionManager:
 
         if project.building_type == "home":
             # Регистрируем новое домохозяйство
-            if hasattr(self.simulation, "household_manager"):
-                self.simulation.household_manager.create_household(b.id)
+            hh = self.simulation.household_manager.create_household(b.id) if hasattr(self.simulation, "household_manager") else None
 
-            # Переселение: ищем взрослых жителей в переполненных домах для новоселья
-            self._relocate_citizens_to_new_home(b.id, b.capacity)
+            # Если дом построен по частному заказу конкретного жителя
+            if project.commissioner_id:
+                commissioner = next((n for n in self.simulation.npcs if n.id == project.commissioner_id and n.is_alive), None)
+                if commissioner:
+                    commissioner.home_id = b.id
+                    if hh: commissioner.household_id = hh.id
+
+                    # Переселяем супруга и детей заказчика
+                    spouse = self.simulation.family_manager.get_spouse(commissioner.id) if hasattr(self.simulation, 'family_manager') else None
+                    if spouse and spouse.is_alive:
+                        spouse.home_id = b.id
+                        if hh: spouse.household_id = hh.id
+
+                    children = self.simulation.family_manager.get_children(commissioner.id) if hasattr(self.simulation, 'family_manager') else []
+                    for c in children:
+                        if c.is_alive and c.get_age(self.simulation.time.current_datetime) < 18:
+                            c.home_id = b.id
+                            if hh: c.household_id = hh.id
+
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.MOVE,
+                        importance=EventImportance.HIGH,
+                        message=f"🎉 Семья {commissioner.get_full_name()} отпраздновала новоселье в построенном доме '{b.name}'!",
+                        participants=[commissioner.id]
+                    )
+            else:
+                # Переселение: ищем взрослых жителей в переполненных домах для новоселья
+                self._relocate_citizens_to_new_home(b.id, b.capacity)
 
         elif project.building_type == "work":
             # Регистрируем новое предприятие
