@@ -131,9 +131,11 @@ def run_simulation_365(run_id: int):
                                 message=f"✝ {npc.get_full_name()} скончался в возрасте {age} лет.",
                                 participants=[npc.id]
                             )
+                            bus.publish("npc_died", {"npc": npc})
 
                 sim.reproduction_manager.update()
                 sim.economy_manager.daily_cycle()
+                sim._process_daily_lifecycle(cur_date)
                 sim.construction_manager.evaluate_city_growth()
 
             for npc in sim.npcs:
@@ -146,7 +148,10 @@ def run_simulation_365(run_id: int):
                 # Needs decay proportional to step
                 npc.hunger = max(0.0, min(100.0, npc.hunger - 0.1 * step_minutes))
                 npc.energy = max(0.0, min(100.0, npc.energy - 0.05 * step_minutes))
-                npc.mood = (npc.hunger + npc.energy) / 2.0
+                if npc.hunger <= 0.0 or npc.energy <= 0.0:
+                    npc.health = max(0.0, getattr(npc, 'health', 100.0) - 0.1 * step_minutes)
+                bio_baseline = (npc.hunger + npc.energy) / 2.0
+                npc.mood = max(0.0, min(100.0, npc.mood * 0.96 + bio_baseline * 0.04))
 
                 # Fast path for continuous states
                 cur_state = npc.state

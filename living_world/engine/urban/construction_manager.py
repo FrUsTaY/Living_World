@@ -1,3 +1,4 @@
+import random
 import uuid
 from typing import List, Optional, Dict
 from living_world.city.city import Building
