@@ -382,10 +382,13 @@ class Database:
             for r in relationships:
                 cursor.execute(
                     """INSERT INTO relationships
-                    (source_npc_id, target_npc_id, familiarity, affinity, trust, respect, romantic_interest, tension, last_interaction_time, initiations_sent, initiations_received)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (source_npc_id, target_npc_id, familiarity, affinity, trust, respect, romantic_interest, tension,
+                    last_interaction_time, last_meaningful_interaction_time, daily_interactions_count, initiations_sent, initiations_received)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (r['source_npc_id'], r['target_npc_id'], r['familiarity'], r['affinity'],
-                     r['trust'], r['respect'], r['romantic_interest'], r['tension'], r.get('last_interaction_time', 0), r.get('initiations_sent', 0), r.get('initiations_received', 0))
+                     r['trust'], r['respect'], r['romantic_interest'], r['tension'], r.get('last_interaction_time', 0),
+                     r.get('last_meaningful_interaction_time', 0), r.get('daily_interactions_count', 0),
+                     r.get('initiations_sent', 0), r.get('initiations_received', 0))
                 )
 
 
