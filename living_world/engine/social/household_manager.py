@@ -14,6 +14,10 @@ class HouseholdManager:
         bus.subscribe("npc_died", self._on_npc_died)
         bus.subscribe("family_conflict", self._on_family_conflict)
 
+    def close(self):
+        bus.unsubscribe("npc_died", self._on_npc_died)
+        bus.unsubscribe("family_conflict", self._on_family_conflict)
+
     def _on_npc_died(self, data):
         npc = data.get("npc")
         if npc and getattr(npc, 'household_id', None):

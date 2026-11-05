@@ -140,6 +140,7 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def new_world(self):
+        self.sim.close()
         self.sim = Simulation()
         self.world_tab.simulation = self.sim
         self.pop_tab.simulation = self.sim
@@ -195,6 +196,7 @@ class MainWindow(QMainWindow):
                     QMessageBox.warning(self, "Загрузка", "В файле нет сохраненного мира.")
                     return
 
+                self.sim.close()
                 self.sim = Simulation()
                 self.sim.time.set_time_from_dict(time_dict)
 

@@ -7,6 +7,9 @@ class FamilyManager:
         self.simulation = simulation
         bus.subscribe("npc_died", self._on_npc_died)
 
+    def close(self):
+        bus.unsubscribe("npc_died", self._on_npc_died)
+
     def _on_npc_died(self, data):
         npc = data.get("npc")
         if not npc: return

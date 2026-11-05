@@ -12,6 +12,9 @@ class EventAggregator:
 
         bus.subscribe("world_event", self._on_world_event)
 
+    def close(self):
+        bus.unsubscribe("world_event", self._on_world_event)
+
     def _on_world_event(self, event_data: dict):
         event = WorldEvent(
             timestamp=event_data["timestamp"],

@@ -42,6 +42,13 @@ class Simulation:
 
         bus.subscribe("log_event", self._on_log_event)
 
+    def close(self):
+        """Release global event-bus subscriptions before discarding a world."""
+        bus.unsubscribe("log_event", self._on_log_event)
+        self.family_manager.close()
+        self.household_manager.close()
+        self.event_aggregator.close()
+
     def _on_log_event(self, msg):
         event = {"time": self.time.format_time(), "msg": msg}
         self.events_log.append(event)
