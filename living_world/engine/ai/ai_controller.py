@@ -1,7 +1,11 @@
 from typing import List, Dict, Type
 import random
 from living_world.engine.ai.action import Action
-from living_world.engine.ai.basic_actions import SleepAction, EatAction, WorkAction, RelaxAction, PlayAction, SocializeAction, StudyAction, StrollAction, DateAction
+from living_world.engine.ai.basic_actions import (
+    SleepAction, EatAction, WorkAction, RelaxAction, PlayAction, 
+    SocializeAction, StudyAction, StrollAction, DateAction,
+    HygieneAction, HobbyAction, VisitDoctorAction
+)
 from living_world.engine.ai.family_actions import CareForChildAction
 
 class AIController:
@@ -17,7 +21,10 @@ class AIController:
             StudyAction(),
             CareForChildAction(),
             StrollAction(),
-            DateAction()
+            DateAction(),
+            HygieneAction(),
+            HobbyAction(),
+            VisitDoctorAction()
         ]
 
     def choose_and_execute_action(self, npc, time_dict):
@@ -30,6 +37,9 @@ class AIController:
         elif cur_state == "Ест" and npc.hunger < 95:
             # Continue eating
             npc.hunger = min(100.0, npc.hunger + 2.0)
+            return
+        elif cur_state == "Принимает душ" and getattr(npc, 'hygiene', 100.0) < 95:
+            npc.hygiene = min(100.0, getattr(npc, 'hygiene', 0.0) + 5.0)
             return
 
         valid_actions = []

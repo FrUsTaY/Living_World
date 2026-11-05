@@ -11,6 +11,8 @@ class SleepAction(Action):
         return True
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
+        if getattr(npc, 'is_sick', False):
+            return 0.0  # Больничный
         hour = time_dict['hour']
         utility = 0.0
 
@@ -18,7 +20,13 @@ class SleepAction(Action):
         if getattr(npc, '_last_state', None) == self.name and npc.energy < 95:
             return 1000.0
 
-        if hour >= 22 or hour < 7:
+        chronotype = getattr(npc, 'chronotype', 'lark')
+        if chronotype == 'lark':
+            is_sleep_hours = (hour >= 21 or hour < 6)
+        else:
+            is_sleep_hours = (hour >= 23 or hour < 8)
+
+        if is_sleep_hours:
             utility += 100
 
             life_stage = npc.get_life_stage(simulation.time.current_datetime)
@@ -30,8 +38,10 @@ class SleepAction(Action):
         elif npc.energy < 20:
             utility += 50
 
-        # При плохом самочувствии (болезнь/истощение) возрастает потребность в сне
-        if getattr(npc, 'health', 100.0) < 40:
+        # При болезни или плохом самочувствии возрастает потребность в сне
+        if getattr(npc, 'is_sick', False):
+            utility += 75
+        elif getattr(npc, 'health', 100.0) < 40:
             utility += 60
 
         return utility
@@ -387,3 +397,135 @@ class DateAction(Action):
             simulation.economy_manager.purchase_food(npc, cost=150.0)
         npc.mood = min(100.0, npc.mood + 2.0)
         npc.energy -= 0.05
+
+
+class HygieneAction(Action):
+    @property
+    def name(self) -> str:
+        return "Принимает душ"
+
+    def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if not npc.is_alive or npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
+        return True
+
+    def calculate_utility(self, npc, simulation, time_dict) -> float:
+        hygiene = getattr(npc, 'hygiene', 100.0)
+        hour = time_dict['hour']
+        utility = 0.0
+
+        if getattr(npc, '_last_state', None) == self.name and hygiene < 95:
+            return 1000.0
+
+        if hygiene < 30:
+            utility += 130
+        elif hygiene < 60 and (7 <= hour < 9 or 21 <= hour < 23):
+            utility += 65
+
+        return utility
+
+    def execute(self, npc, simulation, time_dict):
+        if npc.current_location != npc.home_id:
+            npc.current_location = npc.home_id
+        npc.hygiene = min(100.0, getattr(npc, 'hygiene', 0.0) + 25.0)
+        npc.mood = min(100.0, npc.mood + 1.0)
+
+
+class HobbyAction(Action):
+    @property
+    def name(self) -> str:
+        return "Занимается хобби"
+
+    def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if not npc.is_alive or npc.get_life_stage(simulation.time.current_datetime) in [LifeStage.BABY, LifeStage.CHILD]:
+            return False
+        return not getattr(npc, 'is_sick', False) and npc.energy >= 15 and npc.hunger >= 20
+
+    def calculate_utility(self, npc, simulation, time_dict) -> float:
+        hour = time_dict['hour']
+        is_weekend = time_dict.get('is_weekend', False)
+        stress = getattr(npc, 'stress', 0.0)
+        utility = 0.0
+
+        if (17 <= hour < 22) or (is_weekend and 10 <= hour < 20):
+            utility += 42.0 + (stress * 0.5)
+            if npc.mood < 45:
+                utility += 15.0
+
+        return utility
+
+    def execute(self, npc, simulation, time_dict):
+        hobby = getattr(npc, 'hobby', 'Чтение')
+        if hobby in ['Рыбалка', 'Спорт']:
+            parks = simulation.city.get_places_by_type('park') if hasattr(simulation, 'city') else []
+            if parks:
+                npc.current_location = parks[0].id
+            else:
+                npc.current_location = npc.home_id
+        else:
+            npc.current_location = npc.home_id
+
+        npc.stress = max(0.0, getattr(npc, 'stress', 0.0) - 2.5)
+        npc.mood = min(100.0, npc.mood + 1.5)
+        npc.energy -= 0.05
+
+
+class VisitDoctorAction(Action):
+    @property
+    def name(self) -> str:
+        return "На приеме у врача"
+
+    def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
+        if not npc.is_alive or not getattr(npc, 'is_sick', False):
+            return False
+        return True
+
+    def calculate_utility(self, npc, simulation, time_dict) -> float:
+        hour = time_dict['hour']
+        if 8 <= hour < 18:
+            return 250.0
+        return 0.0
+
+    def execute(self, npc, simulation, time_dict):
+        city = getattr(simulation, 'city', None)
+        doc_building = None
+        if city:
+            doc_building = next((b for b in city.buildings if any(w in b.name.lower() for w in ['больниц', 'поликлиник', 'клиник'])), None)
+            if not doc_building:
+                doc_npc = next((n for n in simulation.npcs if n.is_alive and n.profession == 'Врач' and n.work_id), None)
+                if doc_npc:
+                    doc_building = city.get_building(doc_npc.work_id)
+
+        target_loc = doc_building.id if doc_building else npc.home_id
+        if npc.current_location != target_loc:
+            npc.current_location = target_loc
+
+        fee = 250.0
+        if npc.money >= fee:
+            npc.money -= fee
+            if hasattr(simulation, 'economy_manager'):
+                clinic_ent = simulation.economy_manager.get_enterprise_for_building(target_loc)
+                if clinic_ent:
+                    clinic_ent.receive_revenue(fee)
+                else:
+                    simulation.economy_manager.city_treasury += fee
+
+        npc.is_sick = False
+        npc.sick_days = 0
+        npc.health = min(100.0, getattr(npc, 'health', 50.0) + 35.0)
+        npc.mood = min(100.0, npc.mood + 10.0)
+
+        if hasattr(simulation, 'memory_manager'):
+            simulation.memory_manager.add_memory(
+                npc.id, None, "Лечение", "Посетил(а) врача, прошел(ла) курс лечения и поправился(лась)", 0.6, 0.7
+            )
+        if hasattr(simulation, 'event_aggregator'):
+            from living_world.engine.observer.world_event import EventType, EventImportance
+            simulation.event_aggregator.publish_event(
+                event_type=EventType.SOCIAL_INTERACTION,
+                importance=EventImportance.LOW,
+                message=f"💊 {npc.get_full_name()} посетил(а) врача и успешно вылечился(лась) от болезни.",
+                participants=[npc.id]
+            )

@@ -39,7 +39,13 @@ CREATE TABLE IF NOT EXISTS npcs (
     date_of_death TEXT,
     is_alive INTEGER,
     current_education_id TEXT,
-    education_status TEXT
+    education_status TEXT,
+    hygiene REAL DEFAULT 100.0,
+    stress REAL DEFAULT 0.0,
+    hobby TEXT DEFAULT 'Чтение',
+    chronotype TEXT DEFAULT 'lark',
+    is_sick INTEGER DEFAULT 0,
+    sick_days INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -246,6 +252,18 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN trait_frugality REAL DEFAULT 0.0")
             if 'trait_diligence' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN trait_diligence REAL DEFAULT 0.0")
+            if 'hygiene' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN hygiene REAL DEFAULT 100.0")
+            if 'stress' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN stress REAL DEFAULT 0.0")
+            if 'hobby' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN hobby TEXT DEFAULT 'Чтение'")
+            if 'chronotype' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN chronotype TEXT DEFAULT 'lark'")
+            if 'is_sick' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN is_sick INTEGER DEFAULT 0")
+            if 'sick_days' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN sick_days INTEGER DEFAULT 0")
 
             cursor.execute("PRAGMA table_info(families)")
             columns_fam = [info[1] for info in cursor.fetchall()]
@@ -379,8 +397,9 @@ class Database:
                     (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state,
                     trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience,
                     trait_ambition, trait_frugality, trait_diligence, health, family_id,
-                    date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id,
+                    hygiene, stress, hobby, chronotype, is_sick, sick_days)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -403,7 +422,13 @@ class Database:
                      getattr(npc, 'father_id', None),
                      getattr(npc, 'children_desire', 0.5),
                      getattr(npc, 'household_id', None),
-                     getattr(npc, 'dating_partner_id', None))
+                     getattr(npc, 'dating_partner_id', None),
+                     getattr(npc, 'hygiene', 100.0),
+                     getattr(npc, 'stress', 0.0),
+                     getattr(npc, 'hobby', 'Чтение'),
+                     getattr(npc, 'chronotype', 'lark'),
+                     1 if getattr(npc, 'is_sick', False) else 0,
+                     getattr(npc, 'sick_days', 0))
                 )
 
             # Сохраняем семьи

@@ -5,8 +5,11 @@ from living_world.engine.event_bus import bus
 from living_world.engine.life_cycle_manager import LifeCycleManager, LifeStage
 
 class NPC:
+    HOBBIES = ["Чтение", "Рыбалка", "Спорт", "Кулинария", "Садоводство"]
+
     def __init__(self, first_name, last_name, date_of_birth: datetime, gender, profession, home_id, work_id,
-                 npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None, health=100.0):
+                 npc_id=None, traits=None, family_id=None, mother_id=None, father_id=None, children_desire=None, health=100.0,
+                 hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -42,6 +45,13 @@ class NPC:
 
         self.current_education_id = None
         self.education_status = None
+
+        self.hygiene = float(hygiene)
+        self.stress = float(stress)
+        self.hobby = hobby or random.choice(self.HOBBIES)
+        self.chronotype = chronotype or random.choice(["lark", "owl"])
+        self.is_sick = bool(is_sick)
+        self.sick_days = int(sick_days)
 
         self._last_state = self.state
 
@@ -117,7 +127,11 @@ class NPC:
             "Статус": "Жив" if self.is_alive else "Умер",
             "Профессия": self.profession,
             "Деньги": f"{self.money:.2f} ₽",
-            "Здоровье": f"{int(self.health)}%",
+            "Здоровье": f"{int(self.health)}%" if not self.is_sick else f"{int(self.health)}% (Болен)",
+            "Гигиена": f"{int(self.hygiene)}%",
+            "Стресс": f"{int(self.stress)}%",
+            "Хобби": self.hobby,
+            "Хронотип": "Жаворонок" if self.chronotype == "lark" else "Сова",
             "Настроение": f"{int(self.mood)}%",
             "Энергия": f"{int(self.energy)}%",
             "Голод": f"{int(self.hunger)}%",

@@ -259,6 +259,12 @@ class MainWindow(QMainWindow):
                     npc.energy = nd['energy']
                     npc.mood = nd['mood']
                     npc.health = float(nd.get('health', 100.0))
+                    npc.hygiene = float(nd.get('hygiene', 100.0))
+                    npc.stress = float(nd.get('stress', 0.0))
+                    npc.hobby = nd.get('hobby') or (random.choice(NPC.HOBBIES) if hasattr(NPC, 'HOBBIES') else 'Чтение')
+                    npc.chronotype = nd.get('chronotype') or random.choice(['lark', 'owl'])
+                    npc.is_sick = bool(nd.get('is_sick', 0))
+                    npc.sick_days = int(nd.get('sick_days', 0))
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']

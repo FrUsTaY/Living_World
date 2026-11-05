@@ -136,6 +136,7 @@ class Simulation:
                 self._process_daily_lifecycle(self.time.current_datetime)
                 self.autosave_manager.check_and_autosave(time_dict['day'])
                 self.construction_manager.evaluate_city_growth()
+                self._process_daily_health()
 
             for npc in self.npcs:
                 if not npc.is_alive:
@@ -143,13 +144,31 @@ class Simulation:
 
                 if is_new_day:
                     self.education_manager.update_npc_education(npc, time_dict)
-                # 1. Изменение базовых потребностей и здоровья
+                # 1. Изменение базовых потребностей, гигиены, стресса и здоровья
                 npc.hunger -= 0.1
                 npc.energy -= 0.05
                 npc.hunger = max(0.0, min(100.0, npc.hunger))
                 npc.energy = max(0.0, min(100.0, npc.energy))
 
-                if npc.hunger <= 0.0 or npc.energy <= 0.0:
+                hygiene_decay = 0.08 if npc.state in ["Работает", "Учится"] else 0.04
+                npc.hygiene = max(0.0, getattr(npc, 'hygiene', 100.0) - hygiene_decay)
+
+                stress = getattr(npc, 'stress', 0.0)
+                stress_inc = 0.0
+                if npc.hunger < 30.0:
+                    stress_inc += 0.03
+                if npc.energy < 30.0:
+                    stress_inc += 0.03
+                if getattr(npc, 'hygiene', 100.0) < 30.0:
+                    stress_inc += 0.03
+
+                if npc.state in ["Спит", "Отдыхает", "Гуляет", "Занимается хобби", "Принимает душ"]:
+                    stress = max(0.0, stress - 0.05)
+                else:
+                    stress = min(100.0, stress + stress_inc)
+                npc.stress = stress
+
+                if npc.hunger <= 0.0 or npc.energy <= 0.0 or npc.stress >= 85.0:
                     npc.health = max(0.0, getattr(npc, 'health', 100.0) - 0.1)
 
                 bio_baseline = (npc.hunger + npc.energy) / 2.0
@@ -242,3 +261,45 @@ class Simulation:
                                 message=f"{npc.get_full_name()} начал(а) самостоятельную жизнь и переехал(а) в {target_home.name}.",
                                 participants=[npc.id] + ([spouse.id] if spouse else [])
                             )
+
+    def _process_daily_health(self):
+        import random
+        for npc in self.npcs:
+            if not npc.is_alive:
+                continue
+
+            if getattr(npc, 'is_sick', False):
+                npc.sick_days = getattr(npc, 'sick_days', 0) + 1
+                if npc.current_location == npc.home_id and random.random() < 0.20:
+                    npc.is_sick = False
+                    npc.sick_days = 0
+                    npc.health = min(100.0, getattr(npc, 'health', 50.0) + 20.0)
+                    if hasattr(self, 'event_aggregator'):
+                        self.event_aggregator.publish_event(
+                            event_type=EventType.SOCIAL_INTERACTION,
+                            importance=EventImportance.LOW,
+                            message=f"🌿 {npc.get_full_name()} отлежался(лась) дома и выздоровел(а).",
+                            participants=[npc.id]
+                        )
+                elif npc.sick_days > 5:
+                    npc.health = max(5.0, getattr(npc, 'health', 100.0) - random.uniform(3.0, 8.0))
+            else:
+                sick_prob = 0.004
+                if getattr(npc, 'health', 100.0) < 60.0:
+                    sick_prob += 0.015
+                if getattr(npc, 'stress', 0.0) > 60.0:
+                    sick_prob += 0.01
+                if getattr(npc, 'hygiene', 100.0) < 30.0:
+                    sick_prob += 0.01
+
+                if random.random() < sick_prob:
+                    npc.is_sick = True
+                    npc.sick_days = 0
+                    npc.mood = max(0.0, getattr(npc, 'mood', 50.0) - 15.0)
+                    if hasattr(self, 'event_aggregator'):
+                        self.event_aggregator.publish_event(
+                            event_type=EventType.SOCIAL_INTERACTION,
+                            importance=EventImportance.LOW,
+                            message=f"🤒 {npc.get_full_name()} заболел(а) простудой.",
+                            participants=[npc.id]
+                        )

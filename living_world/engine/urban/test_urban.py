@@ -118,7 +118,10 @@ def test_order_private_home():
     assert wealthy.money == 35000.0
     assert proj in cm.active_projects
 
-    builder = next(n for n in sim.npcs if n.profession == "Строитель")
+    builder = next((n for n in sim.npcs if n.profession == "Строитель"), None)
+    if not builder:
+        builder = NPC("Иван", "Строителев", datetime(1990, 1, 1), "М", "Строитель", "home_1", "work_1")
+        sim.add_npc(builder)
     while not proj.is_completed:
         cm.advance_construction(builder, minutes=100.0)
 
