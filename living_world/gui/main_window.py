@@ -238,6 +238,7 @@ class MainWindow(QMainWindow):
                     npc.education_status = nd.get('education_status')
 
                     npc.household_id = nd.get('household_id')
+                    npc.dating_partner_id = nd.get('dating_partner_id')
 
                     npc.money = nd['money']
                     npc.hunger = nd['hunger']
