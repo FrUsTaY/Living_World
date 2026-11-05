@@ -47,6 +47,48 @@ class FamilyManager:
                 valence=-1.0
             )
 
+        # Распределение наследства
+        estate = getattr(npc, 'money', 0.0)
+        if estate > 0:
+            spouse = self.get_spouse(npc.id)
+            if spouse and spouse.is_alive:
+                spouse.money += estate
+                npc.money = 0.0
+                if hasattr(self.simulation, 'event_aggregator'):
+                    from living_world.engine.observer.world_event import EventType, EventImportance
+                    self.simulation.event_aggregator.publish_event(
+                        event_type=EventType.ECONOMIC,
+                        importance=EventImportance.MEDIUM,
+                        message=f"Наследство: {estate:,.0f} ₽ умершего {npc.get_full_name()} перешли супруге/супругу {spouse.get_full_name()}.",
+                        participants=[npc.id, spouse.id]
+                    )
+            else:
+                children = [c for c in self.get_children(npc.id) if c.is_alive]
+                if children:
+                    share = estate / len(children)
+                    for child in children:
+                        child.money += share
+                    npc.money = 0.0
+                    if hasattr(self.simulation, 'event_aggregator'):
+                        from living_world.engine.observer.world_event import EventType, EventImportance
+                        self.simulation.event_aggregator.publish_event(
+                            event_type=EventType.ECONOMIC,
+                            importance=EventImportance.MEDIUM,
+                            message=f"Наследство: {estate:,.0f} ₽ от {npc.get_full_name()} разделены между детьми ({len(children)} чел.).",
+                            participants=[npc.id] + [c.id for c in children]
+                        )
+                elif hasattr(self.simulation, 'economy_manager') and hasattr(self.simulation.economy_manager, 'city_treasury'):
+                    self.simulation.economy_manager.city_treasury += estate
+                    npc.money = 0.0
+                    if hasattr(self.simulation, 'event_aggregator'):
+                        from living_world.engine.observer.world_event import EventType, EventImportance
+                        self.simulation.event_aggregator.publish_event(
+                            event_type=EventType.ECONOMIC,
+                            importance=EventImportance.LOW,
+                            message=f"Выморочное имущество: {estate:,.0f} ₽ от {npc.get_full_name()} поступили в городскую казну.",
+                            participants=[npc.id]
+                        )
+
     def create_family(self, npc_a, npc_b, time_dict):
         family_id = str(uuid.uuid4())
         npc_a.family_id = family_id

@@ -132,6 +132,7 @@ class Simulation:
             if is_new_day:
                 self.reproduction_manager.update()
                 self.economy_manager.daily_cycle()
+                self._process_daily_lifecycle(self.time.current_datetime)
                 self.autosave_manager.check_and_autosave(time_dict['day'])
                 self.construction_manager.evaluate_city_growth()
 
@@ -168,3 +169,75 @@ class Simulation:
                     )
                 npc._last_state = npc.state
             self.social_manager.process_social_ticks()
+
+    def _process_daily_lifecycle(self, current_date):
+        from living_world.engine.life_cycle_manager import LifeStage
+        import random
+
+        # 1. Выход пожилых на пенсию
+        for npc in self.npcs:
+            if not npc.is_alive:
+                continue
+            age = npc.get_age(current_date)
+            if age >= 65 and npc.profession != "Пенсионер":
+                retire_chance = 0.5 if age >= 70 or npc.profession in ["Строитель", "Механик", "Фермер", "Разнорабочий"] else 0.25
+                if random.random() < retire_chance:
+                    npc.profession = "Пенсионер"
+                    npc.work_id = None
+                    if hasattr(self, 'event_aggregator'):
+                        self.event_aggregator.publish_event(
+                            event_type=EventType.JOB_CHANGE,
+                            importance=EventImportance.LOW,
+                            message=f"{npc.get_full_name()} ({age} лет) вышел(ла) на заслуженную пенсию.",
+                            participants=[npc.id]
+                        )
+
+        # 2. Отделение повзрослевших детей и переезд в свободные дома
+        homes = self.city.get_homes() if hasattr(self, 'city') else []
+        if not homes:
+            return
+
+        home_occupants = {h.id: 0 for h in homes}
+        for n in self.npcs:
+            if n.is_alive and n.home_id in home_occupants:
+                home_occupants[n.home_id] += 1
+
+        for npc in self.npcs:
+            if not npc.is_alive:
+                continue
+            stage = npc.get_life_stage(current_date)
+            if stage in [LifeStage.YOUNG_ADULT, LifeStage.ADULT]:
+                parents = self.family_manager.get_parents(npc.id) if hasattr(self, 'family_manager') else []
+                living_with_parent = any(p.is_alive and p.home_id == npc.home_id for p in parents)
+                if living_with_parent and (npc.money >= 10000.0 or getattr(npc, 'family_id', None) is not None):
+                    available_homes = [h for h in homes if h.id != npc.home_id and home_occupants[h.id] < h.capacity]
+                    if available_homes and random.random() < 0.25:
+                        target_home = random.choice(available_homes)
+                        old_home_id = npc.home_id
+                        new_hh = self.household_manager.create_household(target_home.id) if hasattr(self, 'household_manager') else None
+
+                        npc.home_id = target_home.id
+                        if new_hh:
+                            npc.household_id = new_hh.id
+                        home_occupants[old_home_id] -= 1
+                        home_occupants[target_home.id] += 1
+
+                        spouse = self.family_manager.get_spouse(npc.id) if hasattr(self, 'family_manager') else None
+                        if spouse and spouse.home_id != target_home.id and spouse.home_id in home_occupants:
+                            home_occupants[spouse.home_id] -= 1
+                            spouse.home_id = target_home.id
+                            if new_hh:
+                                spouse.household_id = new_hh.id
+                            home_occupants[target_home.id] += 1
+
+                        if hasattr(self, 'memory_manager'):
+                            self.memory_manager.add_memory(
+                                npc.id, None, "Переезд", f"Начал(а) самостоятельную жизнь, переехав в {target_home.name}", 0.7, 0.8
+                            )
+                        if hasattr(self, 'event_aggregator'):
+                            self.event_aggregator.publish_event(
+                                event_type=EventType.MOVE,
+                                importance=EventImportance.MEDIUM,
+                                message=f"{npc.get_full_name()} начал(а) самостоятельную жизнь и переехал(а) в {target_home.name}.",
+                                participants=[npc.id] + ([spouse.id] if spouse else [])
+                            )
