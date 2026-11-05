@@ -244,6 +244,10 @@ class SocializeAction(Action):
             target = random.choice(places).id
             if npc.current_location != target:
                 npc.current_location = target
+            # Если в кафе, покупает напиток или десерт
+            loc_b = simulation.city.get_building(target) if hasattr(simulation, 'city') else None
+            if loc_b and loc_b.b_type == 'cafe' and hasattr(simulation, 'economy_manager'):
+                simulation.economy_manager.purchase_food(npc, cost=80.0)
         npc.mood = min(100.0, npc.mood + 1.2)
 
 class StudyAction(Action):
@@ -378,5 +382,8 @@ class DateAction(Action):
 
         if npc.current_location != target:
             npc.current_location = target
+        loc_b = simulation.city.get_building(target) if hasattr(simulation, 'city') else None
+        if loc_b and loc_b.b_type == 'cafe' and hasattr(simulation, 'economy_manager'):
+            simulation.economy_manager.purchase_food(npc, cost=150.0)
         npc.mood = min(100.0, npc.mood + 2.0)
         npc.energy -= 0.05

@@ -129,6 +129,14 @@ class EconomyManager:
         """
         from living_world.engine.observer.world_event import EventType, EventImportance
 
+        # 0. Реализация произведенных предприятиями товаров и услуг
+        for ent in list(self.enterprises.values()):
+            if not ent.is_active:
+                continue
+            if ent.daily_revenue == 0 and ent.daily_expenses > 0:
+                commercial_revenue = round(ent.daily_expenses * 1.30, 2)
+                ent.receive_revenue(commercial_revenue)
+
         # 1. Пенсии пожилым жителям (из городской казны)
         daily_pension = 650.0  # ~20 000 ₽ / месяц
         for npc in self.simulation.npcs:

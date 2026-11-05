@@ -228,6 +228,13 @@ class ConstructionManager:
             return None
 
         npc.money -= cost
+        econ = getattr(self.simulation, "economy_manager", None)
+        if econ:
+            const_ent = next((e for e in econ.enterprises.values() if e.enterprise_type == "construction"), None)
+            if const_ent:
+                const_ent.receive_revenue(cost)
+            else:
+                econ.city_treasury += cost
         district = self.get_or_create_target_district()
         final_name = house_name or f"Усадьба {npc.last_name}"
 
