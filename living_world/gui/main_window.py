@@ -188,14 +188,17 @@ class MainWindow(QMainWindow):
             db = Database(dialog.selected_file)
             try:
                 load_res = db.load_world()
-                if len(load_res) >= 14:
+                city_treasury = 100000.0
+                if len(load_res) >= 15:
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury = load_res[:15]
+                elif len(load_res) == 14:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts = load_res
                 elif len(load_res) == 13:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts = load_res
                     enterprises_dicts = []
                 else:
                     # Обратная совместимость
-                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts = load_res
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts = load_res[:12]
                     world_events_dicts = []
                     enterprises_dicts = []
 
@@ -206,6 +209,8 @@ class MainWindow(QMainWindow):
                 self.sim.close()
                 self.sim = Simulation()
                 self.sim.time.set_time_from_dict(time_dict)
+                if hasattr(self.sim, 'economy_manager'):
+                    self.sim.economy_manager.city_treasury = float(city_treasury)
 
                 from living_world.city.city import Building
                 for b in b_dicts:

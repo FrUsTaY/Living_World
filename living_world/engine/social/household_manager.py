@@ -20,7 +20,7 @@ class HouseholdManager:
 
     def _on_npc_died(self, data):
         npc = data.get("npc")
-        if npc and getattr(npc, 'household_id', None):
+        if npc and npc in self.simulation.npcs and getattr(npc, 'household_id', None):
             self.modify_stress(npc.household_id, self.STRESS_DEATH_IMPACT)
 
     def _on_family_conflict(self, data):

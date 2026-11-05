@@ -84,7 +84,8 @@ class Simulation:
             pregnancies=pregnancies,
             households=households,
             world_events=self.event_journal.to_dicts(),
-            enterprises=enterprises
+            enterprises=enterprises,
+            city_treasury=getattr(self.economy_manager, 'city_treasury', 100000.0) if hasattr(self, 'economy_manager') else 100000.0
         )
 
     def add_npc(self, npc):

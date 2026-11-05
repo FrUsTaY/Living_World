@@ -114,7 +114,9 @@ class StatsTab(QWidget):
         richest = sorted(alive_npcs, key=lambda n: n.money, reverse=True)[:3]
         richest_str = ", ".join([f"{n.get_full_name()} ({n.money:.0f} ₽)" for n in richest]) if richest else "Нет"
 
+        treasury = getattr(econ_mgr, 'city_treasury', 0.0) if econ_mgr else 0.0
         self.lbl_econ.setText(
+            f"<b>Городская казна:</b> {treasury:,.0f} ₽<br>"
             f"<b>Общий капитал жителей:</b> {total_wealth:,.0f} ₽<br>"
             f"<b>Среднее богатство жителя:</b> {avg_wealth:,.0f} ₽<br>"
             f"<b>Капитал предприятий:</b> {total_biz:,.0f} ₽<br>"

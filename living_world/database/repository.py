@@ -300,7 +300,7 @@ class Database:
         finally:
             conn.close()
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -318,6 +318,8 @@ class Database:
 
             # Сохраняем мету (время)
             cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("sim_time", json.dumps(sim_time)))
+            if city_treasury is not None:
+                cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("city_treasury", str(city_treasury)))
 
             # Сохраняем образование
             cursor.execute("DELETE FROM educational_institutions")
@@ -543,6 +545,10 @@ class Database:
             except sqlite3.OperationalError:
                 pass
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises
+            cursor.execute("SELECT value FROM meta WHERE key = 'city_treasury'")
+            row_tr = cursor.fetchone()
+            city_treasury = float(row_tr['value']) if row_tr else 100000.0
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury
         finally:
             conn.close()

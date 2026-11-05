@@ -111,7 +111,8 @@ def test_health_recovery_and_decay(tmp_path):
     db_file = tmp_path / "test_stage1.db"
     db = Database(str(db_file))
     db.save_world(sim.time.get_time_dict(), [npc], [], [])
-    _, _, npcs_loaded, _, _, _, _, _, _, _, _, _, _, _ = db.load_world()
+    loaded = db.load_world()
+    npcs_loaded = loaded[2]
     loaded_npc = npcs_loaded[0]
     assert loaded_npc['health'] == pytest.approx(npc.health, 0.01)
     assert 'trait_ambition' in loaded_npc

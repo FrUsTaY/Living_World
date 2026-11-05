@@ -12,7 +12,7 @@ class FamilyManager:
 
     def _on_npc_died(self, data):
         npc = data.get("npc")
-        if not npc: return
+        if not npc or npc not in self.simulation.npcs: return
 
         relatives = set()
 
