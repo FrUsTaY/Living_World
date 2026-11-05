@@ -397,7 +397,9 @@ class Database:
                     (m['owner_npc_id'], m.get('target_npc_id'), m['event_type'], m['description'], m['timestamp'], m['sim_time'], m['significance'], m.get('valence', 0.0))
                 )
 
-            # Сохраняем только новые (несохраненные) события
+            # The in-memory history is the complete source of truth.  Replacing the
+            # table prevents every subsequent save from appending the same history.
+            cursor.execute("DELETE FROM events")
             for event in events:
                 cursor.execute(
                     "INSERT INTO events (timestamp, sim_time, message) VALUES (?, ?, ?)",
