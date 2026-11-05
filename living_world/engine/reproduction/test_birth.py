@@ -100,3 +100,17 @@ def test_baby_init_lifestage():
     baby = sim.npcs[-1]
     assert baby.get_age(sim.time.current_datetime) == 0
     assert baby.get_life_stage(sim.time.current_datetime) == LifeStage.BABY
+
+
+def test_birth_is_cancelled_when_mother_is_dead():
+    sim = DummySimulation()
+    mgr = ReproductionManager(sim)
+    mother = DummyNPC("m1", "Ж", LifeStage.ADULT, "MotherName", "fam1")
+    mother.is_alive = False
+    sim.npcs.append(mother)
+    pregnancy = Pregnancy(mother.id, "unknown_f", datetime(2000, 1, 1), datetime(2000, 10, 7), "active")
+
+    mgr.process_birth(pregnancy)
+
+    assert pregnancy.status == "cancelled"
+    assert sim.npcs == [mother]

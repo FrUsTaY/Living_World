@@ -128,13 +128,14 @@ class ReproductionManager:
              processed_families.add(npc.family_id)
 
     def process_birth(self, pregnancy):
-        pregnancy.status = 'completed'
-
         mother = next((n for n in self.simulation.npcs if n.id == pregnancy.mother_id), None)
         father = next((n for n in self.simulation.npcs if n.id == pregnancy.father_id), None)
 
-        if not mother:
+        if not mother or not getattr(mother, 'is_alive', True):
+            pregnancy.status = 'cancelled'
             return
+
+        pregnancy.status = 'completed'
 
         current_date = self.simulation.time.current_datetime
 
