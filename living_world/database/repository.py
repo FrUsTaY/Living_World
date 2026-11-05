@@ -131,6 +131,17 @@ CREATE TABLE IF NOT EXISTS households (
     creation_time TEXT,
     stress REAL DEFAULT 0.0
 );
+
+CREATE TABLE IF NOT EXISTS enterprises (
+    id TEXT PRIMARY KEY,
+    name TEXT,
+    type TEXT,
+    building_id TEXT,
+    owner_id TEXT,
+    budget REAL,
+    wage_rate REAL,
+    is_active INTEGER DEFAULT 1
+);
 """
 
 class Database:
@@ -242,6 +253,17 @@ class Database:
             if 'stress' not in columns_hh:
                 cursor.execute("ALTER TABLE households ADD COLUMN stress REAL DEFAULT 0.0")
 
+            cursor.execute('''CREATE TABLE IF NOT EXISTS enterprises (
+                id TEXT PRIMARY KEY,
+                name TEXT,
+                type TEXT,
+                building_id TEXT,
+                owner_id TEXT,
+                budget REAL,
+                wage_rate REAL,
+                is_active INTEGER DEFAULT 1
+            )''')
+
             cursor.execute("PRAGMA table_info(memories)")
             columns_mem = [info[1] for info in cursor.fetchall()]
             if 'valence' not in columns_mem:
@@ -262,7 +284,7 @@ class Database:
                     hh_id = home_households[home_id]
                     cursor.execute("UPDATE npcs SET household_id = ? WHERE id = ?", (hh_id, npc_id))
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -272,6 +294,7 @@ class Database:
         if pregnancies is None: pregnancies = []
         if households is None: households = []
         if world_events is None: world_events = []
+        if enterprises is None: enterprises = []
 
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
@@ -417,6 +440,20 @@ class Database:
                     (we['id'], we['timestamp'], we['type'], we['importance'], we['message'], json.dumps(we['participants']), json.dumps(we['data']))
                 )
 
+            # Сохраняем предприятия
+            cursor.execute("DELETE FROM enterprises")
+            for ent in enterprises:
+                if isinstance(ent, dict):
+                    cursor.execute(
+                        "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (ent['id'], ent['name'], ent.get('type') or ent.get('enterprise_type'), ent['building_id'], ent.get('owner_id'), ent.get('budget', 50000.0), ent.get('wage_rate', 250.0), 1 if ent.get('is_active', True) else 0)
+                    )
+                else:
+                    cursor.execute(
+                        "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                        (ent.id, ent.name, ent.enterprise_type, ent.building_id, ent.owner_id, ent.budget, ent.wage_rate, 1 if ent.is_active else 0)
+                    )
+
     def load_world(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
@@ -473,4 +510,11 @@ class Database:
             except sqlite3.OperationalError:
                 pass
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events
+            enterprises = []
+            try:
+                cursor.execute("SELECT * FROM enterprises")
+                enterprises = [dict(r) for r in cursor.fetchall()]
+            except sqlite3.OperationalError:
+                pass
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises

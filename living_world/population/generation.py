@@ -12,14 +12,31 @@ def generate_initial_world(city, simulation, num_npcs=25):
     for i in range(10):
         city.add_building(Building(f"Дом №{i+1}", "home", 4))
 
-    # Создаем базовые рабочие места
-    workplaces = ["Ферма", "Мастерская", "Магазин", "Школа", "Стройка"]
-    for w in workplaces:
-        city.add_building(Building(w, "work", 10))
+    # Создаем базовые рабочие места и предприятия
+    workplaces_data = [
+        ("Ферма", "farm", 35000.0),
+        ("Мастерская", "workshop", 45000.0),
+        ("Магазин", "shop", 50000.0),
+        ("Школа", "school", 60000.0),
+        ("Стройка", "construction", 55000.0)
+    ]
+    for w_name, e_type, budget in workplaces_data:
+        b = Building(w_name, "work", 10)
+        city.add_building(b)
+        if hasattr(simulation, 'economy_manager'):
+            simulation.economy_manager.create_enterprise(w_name, e_type, b.id, budget=budget)
 
     city.add_building(Building("Городской парк", "park", 30))
-    city.add_building(Building("Городское кафе", "cafe", 15))
-    city.add_building(Building("Центральный магазин", "shop", 15))
+
+    b_cafe = Building("Городское кафе", "cafe", 15)
+    city.add_building(b_cafe)
+    if hasattr(simulation, 'economy_manager'):
+        simulation.economy_manager.create_enterprise("Городское кафе", "cafe", b_cafe.id, budget=40000.0)
+
+    b_shop = Building("Центральный магазин", "shop", 15)
+    city.add_building(b_shop)
+    if hasattr(simulation, 'economy_manager'):
+        simulation.economy_manager.create_enterprise("Центральный магазин", "shop", b_shop.id, budget=60000.0)
 
     homes = city.get_homes()
     works = city.get_workplaces()
@@ -88,6 +105,13 @@ def generate_initial_world(city, simulation, num_npcs=25):
 
         npc = NPC(first_name, last_name, date_of_birth, gender, profession, home.id, work.id)
         npc.household_id = home_households[home.id]
+
+        # Начальный капитал и привязка к предприятию
+        npc.money = float(random.randint(2000, 8000))
+        if hasattr(simulation, 'economy_manager'):
+            ent = simulation.economy_manager.get_enterprise_for_building(work.id)
+            if ent:
+                ent.add_employee(npc.id)
 
         # Немного рандомизируем начальные потребности
         npc.hunger = random.uniform(70, 100)

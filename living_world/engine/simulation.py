@@ -10,6 +10,7 @@ from living_world.engine.social.household_manager import HouseholdManager
 from living_world.engine.ai.ai_controller import AIController
 from living_world.engine.education.manager import EducationManager
 from living_world.engine.reproduction.manager import ReproductionManager
+from living_world.engine.economy.economy_manager import EconomyManager
 from living_world.engine.observer.event_journal import EventJournal
 from living_world.engine.observer.event_aggregator import EventAggregator
 from living_world.engine.observer.world_event import EventType, EventImportance
@@ -35,6 +36,7 @@ class Simulation:
         self.ai_controller = AIController(self)
         self.education_manager = EducationManager(self)
         self.reproduction_manager = ReproductionManager(self)
+        self.economy_manager = EconomyManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -66,22 +68,7 @@ class Simulation:
         if self.time.paused:
             return
 
-        # Определяем, сколько минут игрового времени проходит за 1 тик приложения
-        # Допустим 1 тик (вызов update) происходит 10 раз в секунду.
-        # При 1x: 1 игровая минута в секунду -> 0.1 мин за тик.
-        # Чтобы не усложнять дробными минутами, будем накапливать остаток
-        # Либо, для простоты, пусть tick_step зависит от speed.
-
-        # Для 1x: 1 мин раз в N тиков
-        # Для 1000x: 100 мин за тик
-
-        pass # Логика tick_step будет реализована в QThread или таймере GUI,
-             # чтобы UI контролировал частоту вызовов update.
-
         # Будем считать, что при вызове update() проходит 1 минута игрового времени
-        # Важно: tick() возвращает True только если изменилась МИНУТА,
-        # а если speed слишком медленный, он может возвращать False.
-        # Для наших диагностических скриптов time_dict нужен всегда.
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
 
@@ -115,6 +102,7 @@ class Simulation:
 
             if is_new_day:
                 self.reproduction_manager.update()
+                self.economy_manager.daily_cycle()
 
             for npc in self.npcs:
                 if not npc.is_alive:

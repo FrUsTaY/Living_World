@@ -28,6 +28,7 @@ class EventType(Enum):
     FAMILY_CREATED = auto()
     FRIENDSHIP_START = auto()
     ROMANCE_START = auto()
+    ECONOMIC = auto()
     # Агрегированные типы
     AGGREGATED_SOCIAL = auto()
 

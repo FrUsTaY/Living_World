@@ -65,6 +65,10 @@ class EatAction(Action):
         npc.hunger += 2.0
         if npc.current_location != npc.home_id:
              npc.current_location = npc.home_id
+        if getattr(npc, '_last_state', None) != self.name and hasattr(simulation, 'economy_manager'):
+            paid = simulation.economy_manager.purchase_food(npc, cost=100.0)
+            if paid == 0.0:
+                npc.mood = max(0.0, npc.mood - 1.0)
 
 class WorkAction(Action):
     @property
@@ -101,7 +105,10 @@ class WorkAction(Action):
         if npc.current_location != npc.work_id:
              npc.current_location = npc.work_id
         npc.energy -= 0.1
-        npc.money += 1.0
+        if hasattr(simulation, 'economy_manager'):
+            simulation.economy_manager.pay_work_wage(npc, minutes=1.0)
+        else:
+            npc.money += 1.0
 
 class RelaxAction(Action):
     @property

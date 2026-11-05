@@ -173,7 +173,8 @@ class MainWindow(QMainWindow):
                     [r.to_dict() for r in getattr(edu_inst, 'history', [])] if edu_inst else [],
                     getattr(self.sim, 'reproduction_manager', None).active_pregnancies if hasattr(self.sim, 'reproduction_manager') else [],
                     households_to_save,
-                    self.sim.event_journal.to_dicts()
+                    self.sim.event_journal.to_dicts(),
+                    list(self.sim.economy_manager.enterprises.values()) if hasattr(self.sim, 'economy_manager') else []
                 )
                 QMessageBox.information(self, "Сохранение", f"Мир успешно сохранен: {name}")
             except Exception as e:
@@ -185,12 +186,16 @@ class MainWindow(QMainWindow):
             db = Database(dialog.selected_file)
             try:
                 load_res = db.load_world()
-                if len(load_res) == 13:
+                if len(load_res) >= 14:
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts = load_res
+                elif len(load_res) == 13:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts = load_res
+                    enterprises_dicts = []
                 else:
                     # Обратная совместимость
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts = load_res
                     world_events_dicts = []
+                    enterprises_dicts = []
 
                 if not time_dict:
                     QMessageBox.warning(self, "Загрузка", "В файле нет сохраненного мира.")
@@ -287,6 +292,27 @@ class MainWindow(QMainWindow):
                 self.sim.memory_manager.load_memories(memories)
                 self.sim.families = families
                 self.sim.event_journal.load_from_dicts(world_events_dicts)
+
+                if hasattr(self.sim, 'economy_manager') and enterprises_dicts:
+                    from living_world.engine.economy.enterprise import Enterprise
+                    for ed in enterprises_dicts:
+                        ent = Enterprise(
+                            name=ed['name'],
+                            enterprise_type=ed['type'],
+                            building_id=ed['building_id'],
+                            owner_id=ed.get('owner_id'),
+                            budget=ed.get('budget', 50000.0),
+                            wage_rate=ed.get('wage_rate', 250.0),
+                            enterprise_id=ed['id'],
+                            is_active=bool(ed.get('is_active', 1))
+                        )
+                        self.sim.economy_manager.register_enterprise(ent)
+
+                    for n in self.sim.npcs:
+                        if n.is_alive and n.work_id:
+                            w_ent = self.sim.economy_manager.get_enterprise_for_building(n.work_id)
+                            if w_ent:
+                                w_ent.add_employee(n.id)
 
                 self.world_tab.simulation = self.sim
                 self.pop_tab.simulation = self.sim
