@@ -48,7 +48,10 @@ CREATE TABLE IF NOT EXISTS npcs (
     sick_days INTEGER DEFAULT 0,
     alimony_to_id TEXT DEFAULT NULL,
     career_level INTEGER DEFAULT 1,
-    work_experience_days INTEGER DEFAULT 0
+    work_experience_days INTEGER DEFAULT 0,
+    is_renting INTEGER DEFAULT 0,
+    mortgage_debt REAL DEFAULT 0.0,
+    mortgage_payment REAL DEFAULT 0.0
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -153,7 +156,9 @@ CREATE TABLE IF NOT EXISTS enterprises (
     owner_id TEXT,
     budget REAL,
     wage_rate REAL,
-    is_active INTEGER DEFAULT 1
+    is_active INTEGER DEFAULT 1,
+    raw_materials REAL DEFAULT 20.0,
+    finished_goods REAL DEFAULT 20.0
 );
 """
 
@@ -273,6 +278,19 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN career_level INTEGER DEFAULT 1")
             if 'work_experience_days' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN work_experience_days INTEGER DEFAULT 0")
+            if 'is_renting' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN is_renting INTEGER DEFAULT 0")
+            if 'mortgage_debt' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN mortgage_debt REAL DEFAULT 0.0")
+            if 'mortgage_payment' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN mortgage_payment REAL DEFAULT 0.0")
+
+            cursor.execute("PRAGMA table_info(enterprises)")
+            columns_ent = [info[1] for info in cursor.fetchall()]
+            if 'raw_materials' not in columns_ent:
+                cursor.execute("ALTER TABLE enterprises ADD COLUMN raw_materials REAL DEFAULT 20.0")
+            if 'finished_goods' not in columns_ent:
+                cursor.execute("ALTER TABLE enterprises ADD COLUMN finished_goods REAL DEFAULT 20.0")
 
             cursor.execute("PRAGMA table_info(families)")
             columns_fam = [info[1] for info in cursor.fetchall()]
@@ -407,8 +425,8 @@ class Database:
                     trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience,
                     trait_ambition, trait_frugality, trait_diligence, health, family_id,
                     date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id,
-                    hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -440,7 +458,10 @@ class Database:
                      getattr(npc, 'sick_days', 0),
                      getattr(npc, 'alimony_to_id', None),
                      getattr(npc, 'career_level', 1),
-                     getattr(npc, 'work_experience_days', 0))
+                     getattr(npc, 'work_experience_days', 0),
+                     1 if getattr(npc, 'is_renting', False) else 0,
+                     getattr(npc, 'mortgage_debt', 0.0),
+                     getattr(npc, 'mortgage_payment', 0.0))
                 )
 
             # Сохраняем семьи
@@ -506,13 +527,13 @@ class Database:
             for ent in enterprises:
                 if isinstance(ent, dict):
                     cursor.execute(
-                        "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (ent['id'], ent['name'], ent.get('type') or ent.get('enterprise_type'), ent['building_id'], ent.get('owner_id'), ent.get('budget', 50000.0), ent.get('wage_rate', 250.0), 1 if ent.get('is_active', True) else 0)
+                        "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active, raw_materials, finished_goods) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (ent['id'], ent['name'], ent.get('type') or ent.get('enterprise_type'), ent['building_id'], ent.get('owner_id'), ent.get('budget', 50000.0), ent.get('wage_rate', 250.0), 1 if ent.get('is_active', True) else 0, ent.get('raw_materials', 20.0), ent.get('finished_goods', 20.0))
                     )
                 else:
                     cursor.execute(
-                        "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                        (ent.id, ent.name, ent.enterprise_type, ent.building_id, ent.owner_id, ent.budget, ent.wage_rate, 1 if ent.is_active else 0)
+                        "INSERT INTO enterprises (id, name, type, building_id, owner_id, budget, wage_rate, is_active, raw_materials, finished_goods) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        (ent.id, ent.name, ent.enterprise_type, ent.building_id, ent.owner_id, ent.budget, ent.wage_rate, 1 if ent.is_active else 0, getattr(ent, 'raw_materials', 20.0), getattr(ent, 'finished_goods', 20.0))
                     )
             conn.commit()
         finally:

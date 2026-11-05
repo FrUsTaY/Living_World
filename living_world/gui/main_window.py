@@ -268,6 +268,9 @@ class MainWindow(QMainWindow):
                     npc.alimony_to_id = nd.get('alimony_to_id')
                     npc.career_level = int(nd.get('career_level', 1))
                     npc.work_experience_days = int(nd.get('work_experience_days', 0))
+                    npc.is_renting = bool(nd.get('is_renting', 0))
+                    npc.mortgage_debt = float(nd.get('mortgage_debt', 0.0))
+                    npc.mortgage_payment = float(nd.get('mortgage_payment', 0.0))
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']
@@ -324,7 +327,9 @@ class MainWindow(QMainWindow):
                             budget=ed.get('budget', 50000.0),
                             wage_rate=ed.get('wage_rate', 250.0),
                             enterprise_id=ed['id'],
-                            is_active=bool(ed.get('is_active', 1))
+                            is_active=bool(ed.get('is_active', 1)),
+                            raw_materials=float(ed.get('raw_materials', 20.0)),
+                            finished_goods=float(ed.get('finished_goods', 20.0))
                         )
                         self.sim.economy_manager.register_enterprise(ent)
 

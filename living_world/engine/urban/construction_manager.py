@@ -224,11 +224,23 @@ class ConstructionManager:
 
     def order_private_home(self, npc, house_name: Optional[str] = None) -> Optional[ConstructionProject]:
         cost = 35000.0
-        if npc.money < cost:
+        econ = getattr(self.simulation, "economy_manager", None)
+        is_mortgage = False
+        loan_amount = 0.0
+
+        if npc.money >= cost:
+            npc.money -= cost
+        elif npc.money >= 10000.0 and getattr(npc, 'work_id', None) and econ and econ.city_treasury >= (cost - npc.money):
+            down_payment = npc.money
+            loan_amount = cost - down_payment
+            npc.money = 0.0
+            econ.city_treasury -= loan_amount
+            npc.mortgage_debt = round(loan_amount * 1.05, 2)
+            npc.mortgage_payment = round(npc.mortgage_debt / 60.0, 2)
+            is_mortgage = True
+        else:
             return None
 
-        npc.money -= cost
-        econ = getattr(self.simulation, "economy_manager", None)
         if econ:
             const_ent = next((e for e in econ.enterprises.values() if e.enterprise_type == "construction"), None)
             if const_ent:
@@ -248,10 +260,11 @@ class ConstructionManager:
         )
         self.active_projects.append(project)
 
+        mortgage_msg = f" (с оформлением ипотечного кредита на {loan_amount:,.0f} ₽ под 5%)" if is_mortgage else ""
         self.simulation.event_aggregator.publish_event(
             event_type=EventType.ECONOMIC,
             importance=EventImportance.HIGH,
-            message=f"🏡 {npc.get_full_name()} профинансировал(а) строительство семейного дома '{project.name}' ({district.name}).",
+            message=f"🏡 {npc.get_full_name()} профинансировал(а) строительство семейного дома '{project.name}' ({district.name}){mortgage_msg}.",
             participants=[npc.id]
         )
         return project

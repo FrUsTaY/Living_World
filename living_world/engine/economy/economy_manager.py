@@ -205,6 +205,8 @@ class EconomyManager:
                     self.found_private_business(npc)
 
         self.process_labor_market()
+        self.process_supply_chains()
+        self.process_banking_and_welfare()
 
     def found_private_business(self, npc) -> Optional[Enterprise]:
         investment = 40000.0
@@ -356,3 +358,81 @@ class EconomyManager:
                             message=f"💼 Биржа труда: {candidate.get_full_name()} принят(а) в {ent.name} на должность '{candidate.profession}'.",
                             participants=[candidate.id]
                         )
+
+    def process_supply_chains(self):
+        # 1. Производство сырья на фермах
+        farms = [e for e in self.enterprises.values() if e.is_active and e.enterprise_type == 'farm']
+        for farm in farms:
+            produced_raw = max(5.0, len(farm.employees) * 10.0)
+            farm.raw_materials += produced_raw
+
+        # 2. Мастерские и магазины закупают сырье у ферм
+        processors = [e for e in self.enterprises.values() if e.is_active and e.enterprise_type in ['workshop', 'shop']]
+        for proc in processors:
+            needed = 15.0
+            for farm in farms:
+                if farm.raw_materials >= 5.0 and proc.budget >= 300.0:
+                    bought = min(needed, farm.raw_materials)
+                    cost = bought * 20.0
+                    if proc.budget >= cost:
+                        proc.pay_expense(cost)
+                        farm.receive_revenue(cost)
+                        farm.raw_materials -= bought
+                        proc.raw_materials += bought
+                        needed -= bought
+                if needed <= 0:
+                    break
+
+            if proc.raw_materials >= 5.0:
+                conv = min(proc.raw_materials, 15.0)
+                proc.raw_materials -= conv
+                proc.finished_goods += conv * 1.5
+
+        # 3. Кафе закупают готовую продукцию у магазинов
+        cafes = [e for e in self.enterprises.values() if e.is_active and e.enterprise_type == 'cafe']
+        shops = [e for e in self.enterprises.values() if e.is_active and e.enterprise_type == 'shop']
+        for cafe in cafes:
+            if cafe.finished_goods < 20.0 and shops and cafe.budget >= 300.0:
+                supplier = max(shops, key=lambda s: s.finished_goods)
+                if supplier.finished_goods >= 10.0:
+                    transfer_goods = min(15.0, supplier.finished_goods)
+                    cost = transfer_goods * 25.0
+                    if cafe.budget >= cost:
+                        cafe.pay_expense(cost)
+                        supplier.receive_revenue(cost)
+                        supplier.finished_goods -= transfer_goods
+                        cafe.finished_goods += transfer_goods
+
+    def process_banking_and_welfare(self):
+        from living_world.engine.observer.world_event import EventType, EventImportance
+        from living_world.engine.life_cycle_manager import LifeStage
+
+        # 1. Погашение ипотечных кредитов
+        for npc in self.simulation.npcs:
+            if not npc.is_alive:
+                continue
+            if getattr(npc, 'mortgage_debt', 0.0) > 0:
+                pay = min(npc.money, getattr(npc, 'mortgage_payment', 100.0))
+                if pay > 0:
+                    npc.money -= pay
+                    npc.mortgage_debt = max(0.0, npc.mortgage_debt - pay)
+                    self.city_treasury += pay
+                    if npc.mortgage_debt == 0.0:
+                        npc.mortgage_payment = 0.0
+                        if hasattr(self.simulation, 'event_aggregator'):
+                            self.simulation.event_aggregator.publish_event(
+                                event_type=EventType.ECONOMIC,
+                                importance=EventImportance.HIGH,
+                                message=f"🎉 {npc.get_full_name()} полностью выплатил(а) ипотечный кредит за жилье!",
+                                participants=[npc.id]
+                            )
+
+        # 2. Выплата детских пособий матерям с младенцами
+        current_date = self.simulation.time.current_datetime
+        for npc in self.simulation.npcs:
+            if npc.is_alive and npc.gender == 'Ж':
+                children = self.simulation.family_manager.get_children(npc.id) if hasattr(self.simulation, 'family_manager') else []
+                has_baby = any(c.is_alive and c.get_life_stage(current_date) == LifeStage.BABY for c in children)
+                if has_baby and self.city_treasury >= 200.0:
+                    self.city_treasury -= 200.0
+                    npc.money += 200.0

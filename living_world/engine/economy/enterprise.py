@@ -15,7 +15,9 @@ class Enterprise:
         budget: float = 50000.0,
         wage_rate: float = 250.0,
         enterprise_id: Optional[str] = None,
-        is_active: bool = True
+        is_active: bool = True,
+        raw_materials: float = 20.0,
+        finished_goods: float = 20.0
     ):
         self.id = enterprise_id or str(uuid.uuid4())
         self.name = name
@@ -28,6 +30,8 @@ class Enterprise:
         self.employees: List[str] = []
         self.daily_revenue: float = 0.0
         self.daily_expenses: float = 0.0
+        self.raw_materials: float = float(raw_materials)
+        self.finished_goods: float = float(finished_goods)
 
     def add_employee(self, npc_id: str):
         if npc_id not in self.employees:
