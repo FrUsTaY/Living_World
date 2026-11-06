@@ -4,35 +4,24 @@ setlocal
 cd /d "%~dp0"
 
 echo ========================================================
-echo         Living World - 120 Days Diagnostics Run
+echo        Living World - Диагностический прогон (120 дней)
 echo ========================================================
 echo.
 
-set "VENV_DIR=.venv"
-if not exist ".venv\Scripts\activate.bat" if exist "venv\Scripts\activate.bat" set "VENV_DIR=venv"
-
-if not exist "%VENV_DIR%\Scripts\activate.bat" (
-    set "PYTHON="
-    py -3 --version >nul 2>&1 && set "PYTHON=py -3"
-    if "%PYTHON%"=="" python --version >nul 2>&1 && set "PYTHON=python"
-    if "%PYTHON%"=="" (
-        echo [ERROR] Python not found in PATH!
-        pause
-        exit /b 1
-    )
-    echo [*] Creating virtual environment %VENV_DIR%...
-    %PYTHON% -m venv %VENV_DIR%
-    call "%VENV_DIR%\Scripts\activate.bat"
-    python -m pip install -r requirements.txt
+if exist ".venv\Scripts\activate.bat" (
+    call ".venv\Scripts\activate.bat"
 ) else (
-    call "%VENV_DIR%\Scripts\activate.bat"
+    echo [*] Активация окружения...
+    py -3 -m venv .venv 2>nul || python -m venv .venv
+    call ".venv\Scripts\activate.bat"
+    python -m pip install -r requirements.txt
 )
 
-echo [*] Launching 120-day headless diagnostic run...
+echo [*] Запуск фоновой диагностики на 120 дней...
 echo.
 python run_120_days_diagnostics.py --npc 25 --days 120 --seed 42
 
 echo.
 echo ========================================================
-echo Diagnostics complete. Press any key to exit...
-pause > nul
+echo Диагностика завершена.
+pause
