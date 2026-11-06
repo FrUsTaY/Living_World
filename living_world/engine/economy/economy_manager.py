@@ -331,7 +331,7 @@ class EconomyManager:
         current_date = self.simulation.time.current_datetime
         unemployed = [
             n for n in self.simulation.npcs
-            if n.is_alive and (n.profession == "Безработный" or not n.work_id) and 18 <= n.get_age(current_date) < 65
+            if n.is_alive and (n.profession == "Безработный" or not n.work_id) and 18 <= n.get_age(current_date) < 65 and getattr(n, 'jail_days', 0) == 0
         ]
 
         if unemployed:

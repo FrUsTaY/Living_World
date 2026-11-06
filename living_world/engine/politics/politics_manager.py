@@ -108,6 +108,11 @@ class PoliticsManager:
             avg_mood = sum(getattr(n, 'mood', 50.0) for n in alive_npcs) / len(alive_npcs)
             rating += (avg_mood - 50.0) * 0.4
 
+        crime_mgr = getattr(self.simulation, 'crime_manager', None)
+        if crime_mgr and crime_mgr.total_crimes_committed > 0:
+            unsolved = max(0, crime_mgr.total_crimes_committed - crime_mgr.total_crimes_solved)
+            rating -= min(20.0, unsolved * 2.0)
+
         self.approval_rating = max(5.0, min(98.0, round(rating, 1)))
 
     def trigger_election(self, current_datetime: datetime, reason: str = "плановых выборов"):

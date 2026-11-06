@@ -12,7 +12,7 @@ class NPC:
                  hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0, alimony_to_id=None,
                  career_level=1, work_experience_days=0,
                  is_renting=False, mortgage_debt=0.0, mortgage_payment=0.0,
-                 transport_mode=None):
+                 transport_mode=None, has_criminal_record=False, jail_days=0):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -62,6 +62,8 @@ class NPC:
         self.chronotype = chronotype or random.choice(["lark", "owl"])
         self.is_sick = bool(is_sick)
         self.sick_days = int(sick_days)
+        self.has_criminal_record = bool(has_criminal_record)
+        self.jail_days = int(jail_days)
 
         self._last_state = self.state
 
@@ -113,7 +115,7 @@ class NPC:
             return False
 
         # Blocking states
-        if self.state in ["Спит", "Работает", "Учится", "Мёртв"]:
+        if self.state in ["Спит", "Работает", "Учится", "Мёртв", "В тюрьме"] or getattr(self, 'jail_days', 0) > 0:
             return False
 
         return True
@@ -150,7 +152,9 @@ class NPC:
             "Партнёр": self.dating_partner_id if self.dating_partner_id else "Нет",
             "Алименты": "Выплачивает" if self.alimony_to_id else "Нет",
             "Ипотека": f"{self.mortgage_debt:,.0f} ₽ ({self.mortgage_payment:,.0f} ₽/день)" if self.mortgage_debt > 0 else "Нет",
-            "Транспорт": "Автомобиль" if self.transport_mode == "car" else ("Автобус" if self.transport_mode == "bus" else "Пешком")
+            "Транспорт": "Автомобиль" if self.transport_mode == "car" else ("Автобус" if self.transport_mode == "bus" else "Пешком"),
+            "Судимость": "Есть" if self.has_criminal_record else "Нет",
+            "Статус заключения": f"В тюрьме ({self.jail_days} дн.)" if self.jail_days > 0 else "На свободе"
         }
 
         if city:

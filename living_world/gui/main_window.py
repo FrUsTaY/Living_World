@@ -190,7 +190,10 @@ class MainWindow(QMainWindow):
                 load_res = db.load_world()
                 city_treasury = 100000.0
                 politics_data = None
-                if len(load_res) >= 16:
+                crimes_data = None
+                if len(load_res) >= 17:
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury, politics_data, crimes_data = load_res[:17]
+                elif len(load_res) == 16:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury, politics_data = load_res[:16]
                 elif len(load_res) == 15:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury = load_res[:15]
@@ -216,6 +219,8 @@ class MainWindow(QMainWindow):
                     self.sim.economy_manager.city_treasury = float(city_treasury)
                 if hasattr(self.sim, 'politics_manager') and politics_data:
                     self.sim.politics_manager.load_from_dict(politics_data)
+                if hasattr(self.sim, 'crime_manager') and crimes_data:
+                    self.sim.crime_manager.load_from_dict(crimes_data)
 
                 from living_world.city.city import Building
                 for b in b_dicts:
@@ -283,6 +288,8 @@ class MainWindow(QMainWindow):
                     npc.mortgage_debt = float(nd.get('mortgage_debt', 0.0))
                     npc.mortgage_payment = float(nd.get('mortgage_payment', 0.0))
                     npc.transport_mode = nd.get('transport_mode', 'foot')
+                    npc.has_criminal_record = bool(nd.get('has_criminal_record', 0))
+                    npc.jail_days = int(nd.get('jail_days', 0))
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']

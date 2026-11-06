@@ -52,7 +52,9 @@ CREATE TABLE IF NOT EXISTS npcs (
     is_renting INTEGER DEFAULT 0,
     mortgage_debt REAL DEFAULT 0.0,
     mortgage_payment REAL DEFAULT 0.0,
-    transport_mode TEXT DEFAULT 'foot'
+    transport_mode TEXT DEFAULT 'foot',
+    has_criminal_record INTEGER DEFAULT 0,
+    jail_days INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -299,6 +301,10 @@ class Database:
 
             if 'transport_mode' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN transport_mode TEXT DEFAULT 'foot'")
+            if 'has_criminal_record' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN has_criminal_record INTEGER DEFAULT 0")
+            if 'jail_days' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN jail_days INTEGER DEFAULT 0")
 
             cursor.execute("PRAGMA table_info(buildings)")
             columns_b = [info[1] for info in cursor.fetchall()]
@@ -364,7 +370,7 @@ class Database:
         finally:
             conn.close()
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None, crimes=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -386,6 +392,8 @@ class Database:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("city_treasury", str(city_treasury)))
             if politics is not None:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("politics", json.dumps(politics)))
+            if crimes is not None:
+                cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("crimes", json.dumps(crimes)))
 
             # Сохраняем образование
             cursor.execute("DELETE FROM educational_institutions")
@@ -442,8 +450,8 @@ class Database:
             for npc in npcs:
                 cursor.execute(
                     """INSERT INTO npcs
-                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode, has_criminal_record, jail_days)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -479,7 +487,9 @@ class Database:
                      1 if getattr(npc, 'is_renting', False) else 0,
                      getattr(npc, 'mortgage_debt', 0.0),
                      getattr(npc, 'mortgage_payment', 0.0),
-                     getattr(npc, 'transport_mode', 'foot'))
+                     getattr(npc, 'transport_mode', 'foot'),
+                     1 if getattr(npc, 'has_criminal_record', False) else 0,
+                     getattr(npc, 'jail_days', 0))
                 )
 
             # Сохраняем семьи
@@ -629,6 +639,10 @@ class Database:
             row_pol = cursor.fetchone()
             politics_data = json.loads(row_pol['value']) if row_pol and row_pol['value'] else None
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data
+            cursor.execute("SELECT value FROM meta WHERE key = 'crimes'")
+            row_cr = cursor.fetchone()
+            crimes_data = json.loads(row_cr['value']) if row_cr and row_cr['value'] else None
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data, crimes_data
         finally:
             conn.close()

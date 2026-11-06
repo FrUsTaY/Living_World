@@ -47,6 +47,8 @@ class Simulation:
         self.city_chronicle = CityChronicle(self)
         from living_world.engine.politics.politics_manager import PoliticsManager
         self.politics_manager = PoliticsManager(self)
+        from living_world.engine.justice.crime_manager import CrimeManager
+        self.crime_manager = CrimeManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -92,7 +94,8 @@ class Simulation:
             world_events=self.event_journal.to_dicts(),
             enterprises=enterprises,
             city_treasury=getattr(self.economy_manager, 'city_treasury', 100000.0) if hasattr(self, 'economy_manager') else 100000.0,
-            politics=self.politics_manager.to_dict() if hasattr(self, 'politics_manager') else None
+            politics=self.politics_manager.to_dict() if hasattr(self, 'politics_manager') else None,
+            crimes=self.crime_manager.to_dict() if hasattr(self, 'crime_manager') else None
         )
 
     def add_npc(self, npc):
@@ -139,6 +142,9 @@ class Simulation:
                     if household.stress > 0:
                         self.household_manager.modify_stress(household.id, -self.household_manager.STRESS_DAILY_DECAY)
 
+            if time_dict['minute'] == 0 and time_dict['hour'] in [14, 21]:
+                self.crime_manager.evaluate_and_trigger_crimes(self.time.current_datetime)
+
             if is_new_day:
                 self.reproduction_manager.update()
                 self.economy_manager.daily_cycle()
@@ -147,6 +153,7 @@ class Simulation:
                 self.construction_manager.evaluate_city_growth()
                 self._process_daily_health()
                 self.politics_manager.daily_update(self.time.current_datetime)
+                self.crime_manager.daily_update(self.time.current_datetime)
 
             for npc in self.npcs:
                 if not npc.is_alive:

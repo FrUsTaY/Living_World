@@ -28,6 +28,9 @@ class AIController:
         ]
 
     def choose_and_execute_action(self, npc, time_dict):
+        if getattr(npc, 'jail_days', 0) > 0 or npc.state == "В тюрьме":
+            npc.state = "В тюрьме"
+            return
         # Fast path for continuous actions
         cur_state = npc.state
         if cur_state == "Спит" and npc.energy < 95:
