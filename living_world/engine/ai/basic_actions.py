@@ -342,7 +342,13 @@ class StrollAction(Action):
                 utility += 15
             if npc.mood < 50:
                 utility += 15
-        return utility
+        if hasattr(simulation, 'weather_manager'):
+            cond = simulation.weather_manager.weather_condition
+            if any(w in cond for w in ["дождь", "Дождь", "Гроза", "Метель", "Снегопад"]):
+                utility -= 40.0
+            elif any(w in cond for w in ["Солнечно", "ясно", "Теплый"]):
+                utility += 25.0
+        return max(0.0, utility)
 
     def execute(self, npc, simulation, time_dict):
         parks = simulation.city.get_places_by_type('park')

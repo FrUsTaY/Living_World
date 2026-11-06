@@ -41,6 +41,8 @@ class Simulation:
         self.economy_manager = EconomyManager(self)
         self.autosave_manager = AutosaveManager(self)
         self.construction_manager = ConstructionManager(self)
+        from living_world.engine.environment.weather_manager import WeatherManager
+        self.weather_manager = WeatherManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -101,6 +103,7 @@ class Simulation:
         # Будем считать, что при вызове update() проходит 1 минута игрового времени
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
+            self.weather_manager.update_weather(self.time.current_datetime)
 
             # Check for natural death once a day (at midnight, e.g. 00:00)
             is_new_day = (time_dict['hour'] == 0 and time_dict['minute'] == 0)
@@ -323,6 +326,8 @@ class Simulation:
                     sick_prob += 0.01
                 if getattr(npc, 'hygiene', 100.0) < 30.0:
                     sick_prob += 0.01
+                if hasattr(self, 'weather_manager') and self.weather_manager.temperature < 0.0:
+                    sick_prob += 0.012
 
                 if random.random() < sick_prob:
                     npc.is_sick = True
