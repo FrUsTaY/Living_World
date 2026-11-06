@@ -301,6 +301,11 @@ class MainWindow(QMainWindow):
                     npc.has_criminal_record = bool(nd.get('has_criminal_record', 0))
                     npc.jail_days = int(nd.get('jail_days', 0))
                     npc.has_warm_clothes = bool(nd.get('has_warm_clothes', 0))
+                    if nd.get('genetics'):
+                        try:
+                            npc.genetics = json.loads(nd['genetics']) if isinstance(nd['genetics'], str) else nd['genetics']
+                        except:
+                            pass
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']

@@ -166,6 +166,8 @@ class ReproductionManager:
         baby.household_id = getattr(mother, 'household_id', None)
         baby.money = 0.0
 
+        from living_world.engine.genetics.genetics_manager import GeneticsManager
+        baby.genetics = GeneticsManager.generate_genome(father=father, mother=mother, gender=gender)
         self.simulation.add_npc(baby)
         self.simulation._has_babies = True
 

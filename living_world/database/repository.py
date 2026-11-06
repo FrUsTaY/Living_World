@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS npcs (
     transport_mode TEXT DEFAULT 'foot',
     has_criminal_record INTEGER DEFAULT 0,
     jail_days INTEGER DEFAULT 0,
-    has_warm_clothes INTEGER DEFAULT 0
+    has_warm_clothes INTEGER DEFAULT 0,
+    genetics TEXT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -308,6 +309,8 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN jail_days INTEGER DEFAULT 0")
             if 'has_warm_clothes' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN has_warm_clothes INTEGER DEFAULT 0")
+            if 'genetics' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN genetics TEXT DEFAULT NULL")
 
             cursor.execute("PRAGMA table_info(buildings)")
             columns_b = [info[1] for info in cursor.fetchall()]
@@ -465,8 +468,8 @@ class Database:
             for npc in npcs:
                 cursor.execute(
                     """INSERT INTO npcs
-                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode, has_criminal_record, jail_days, has_warm_clothes)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode, has_criminal_record, jail_days, has_warm_clothes, genetics)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -505,7 +508,8 @@ class Database:
                      getattr(npc, 'transport_mode', 'foot'),
                      1 if getattr(npc, 'has_criminal_record', False) else 0,
                      getattr(npc, 'jail_days', 0),
-                     1 if getattr(npc, 'has_warm_clothes', False) else 0)
+                     1 if getattr(npc, 'has_warm_clothes', False) else 0,
+                     json.dumps(getattr(npc, 'genetics', None)) if getattr(npc, 'genetics', None) else None)
                 )
 
             # Сохраняем семьи

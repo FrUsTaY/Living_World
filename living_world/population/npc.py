@@ -13,7 +13,8 @@ class NPC:
                  career_level=1, work_experience_days=0,
                  is_renting=False, mortgage_debt=0.0, mortgage_payment=0.0,
                  transport_mode=None, has_criminal_record=False, jail_days=0,
-                 inspiration_buffer_days=0, has_warm_clothes=False):
+                 inspiration_buffer_days=0, has_warm_clothes=False,
+                 genetics=None):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -67,6 +68,8 @@ class NPC:
         self.jail_days = int(jail_days)
         self.inspiration_buffer_days = int(inspiration_buffer_days)
         self.has_warm_clothes = bool(has_warm_clothes)
+        from living_world.engine.genetics.genetics_manager import GeneticsManager
+        self.genetics = genetics if genetics is not None else GeneticsManager.generate_genome(gender=self.gender)
 
         self._last_state = self.state
 
@@ -158,7 +161,8 @@ class NPC:
             "Транспорт": "Автомобиль" if self.transport_mode == "car" else ("Автобус" if self.transport_mode == "bus" else "Пешком"),
             "Судимость": "Есть" if self.has_criminal_record else "Нет",
             "Статус заключения": f"В тюрьме ({self.jail_days} дн.)" if self.jail_days > 0 else "На свободе",
-            "Зимняя одежда": "Есть" if self.has_warm_clothes else "Нет"
+            "Зимняя одежда": "Есть" if self.has_warm_clothes else "Нет",
+            "Фенотип": f"Глаза: {self.genetics.get('eye_color', '—')}, Волосы: {self.genetics.get('hair_color', '—')}, Рост: {self.genetics.get('height_cm', 175)} см ({self.genetics.get('body_type', 'Нормальное')})"
         }
 
         if city:
