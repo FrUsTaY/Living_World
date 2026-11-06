@@ -38,12 +38,11 @@ class EventsTab(QWidget):
         self.layout.addWidget(self.list_widget)
 
     def update_data(self):
-        self.list_widget.clear()
         events = getattr(self.simulation, "events_log", [])
         filter_idx = self.cb_filter.currentIndex()
 
         displayed = []
-        for ev in events:
+        for ev in reversed(events):
             msg = ev.get("msg", "")
             if filter_idx == 1 and not any(mark in msg for mark in ["женился", "родил", "скончался", "познакомился", "встреч", "рабо"]):
                 continue
@@ -52,13 +51,22 @@ class EventsTab(QWidget):
             elif filter_idx == 3 and not any(mark in msg for mark in ["родил", "скончался", "возраст", "брак", "свадьб"]):
                 continue
             displayed.append(ev)
+            if len(displayed) >= 200:
+                break
 
-        self.lbl_count.setText(f"Отображено событий: {len(displayed)}")
+        displayed.reverse()
 
-        for ev in displayed:
-            time_str = ev.get("time", "")
-            msg = ev.get("msg", "")
-            self.list_widget.addItem(f"[{time_str}] {msg}")
+        self.lbl_count.setText(f"Отображено: {len(displayed)} (всего: {len(events)})")
 
-        if self.chk_autoscroll.isChecked():
-            self.list_widget.scrollToBottom()
+        self.list_widget.setUpdatesEnabled(False)
+        try:
+            self.list_widget.clear()
+            for ev in displayed:
+                time_str = ev.get("time", "")
+                msg = ev.get("msg", "")
+                self.list_widget.addItem(f"[{time_str}] {msg}")
+
+            if self.chk_autoscroll.isChecked():
+                self.list_widget.scrollToBottom()
+        finally:
+            self.list_widget.setUpdatesEnabled(True)

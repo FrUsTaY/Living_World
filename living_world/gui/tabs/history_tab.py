@@ -46,8 +46,8 @@ class HistoryTab(QWidget):
         self.table = QTableWidget()
         self.table.setColumnCount(3)
         self.table.setHorizontalHeaderLabels(["Время / Дата", "Важность", "Историческое событие"])
-        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeToContents)
-        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        self.table.setColumnWidth(0, 150)
+        self.table.setColumnWidth(1, 120)
         self.table.horizontalHeader().setSectionResizeMode(2, QHeaderView.Stretch)
         self.table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -83,25 +83,31 @@ class HistoryTab(QWidget):
                 continue
 
             filtered_events.append(ev)
+            if len(filtered_events) >= 200:
+                break
 
-        self.table.setRowCount(len(filtered_events))
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(filtered_events))
 
-        importance_names = {
-            EventImportance.CRITICAL: ("КРИТИЧЕСКОЕ", "#e74c3c"),
-            EventImportance.HIGH: ("ВАЖНОЕ", "#e67e22"),
-            EventImportance.MEDIUM: ("Обычное", "#3498db"),
-            EventImportance.LOW: ("Мелкое", "#7f8c8d")
-        }
+            importance_names = {
+                EventImportance.CRITICAL: ("КРИТИЧЕСКОЕ", "#e74c3c"),
+                EventImportance.HIGH: ("ВАЖНОЕ", "#e67e22"),
+                EventImportance.MEDIUM: ("Обычное", "#3498db"),
+                EventImportance.LOW: ("Мелкое", "#7f8c8d")
+            }
 
-        for row, ev in enumerate(filtered_events):
-            # Время
-            self.table.setItem(row, 0, QTableWidgetItem(ev.timestamp))
+            for row, ev in enumerate(filtered_events):
+                # Время
+                self.table.setItem(row, 0, QTableWidgetItem(ev.timestamp))
 
-            # Важность
-            imp_label, color = importance_names.get(ev.importance, ("—", "#000000"))
-            imp_item = QTableWidgetItem(imp_label)
-            self.table.setItem(row, 1, imp_item)
+                # Важность
+                imp_label, color = importance_names.get(ev.importance, ("—", "#000000"))
+                imp_item = QTableWidgetItem(imp_label)
+                self.table.setItem(row, 1, imp_item)
 
-            # Сообщение
-            msg_item = QTableWidgetItem(ev.message)
-            self.table.setItem(row, 2, msg_item)
+                # Сообщение
+                msg_item = QTableWidgetItem(ev.message)
+                self.table.setItem(row, 2, msg_item)
+        finally:
+            self.table.setUpdatesEnabled(True)

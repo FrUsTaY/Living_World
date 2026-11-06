@@ -53,6 +53,7 @@ class Simulation:
         self.holiday_manager = HolidayManager(self)
         from living_world.engine.property.property_manager import PropertyManager
         self.property_manager = PropertyManager(self)
+        self._has_babies = False
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -106,6 +107,9 @@ class Simulation:
 
     def add_npc(self, npc):
         self.npcs.append(npc)
+        from living_world.engine.life_cycle_manager import LifeStage
+        if hasattr(npc, 'get_life_stage') and npc.get_life_stage(self.time.current_datetime) == LifeStage.BABY:
+            self._has_babies = True
 
     def update(self):
         # Реальное время, которое должно симулироваться за один цикл

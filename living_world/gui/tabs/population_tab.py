@@ -60,64 +60,68 @@ class PopulationTab(QWidget):
         alive_cnt = sum(1 for n in filtered if n.is_alive)
         self.lbl_count.setText(f"Жителей: {len(filtered)} (живых: {alive_cnt})")
 
-        self.table.setRowCount(len(filtered))
+        self.table.setUpdatesEnabled(False)
+        try:
+            self.table.setRowCount(len(filtered))
 
-        for row, npc in enumerate(filtered):
-            # 0. Имя
-            name_item = QTableWidgetItem(npc.get_full_name())
-            name_item.setData(Qt.UserRole, npc)
-            if not npc.is_alive:
-                name_item.setForeground(Qt.gray)
-            self.table.setItem(row, 0, name_item)
+            for row, npc in enumerate(filtered):
+                # 0. Имя
+                name_item = QTableWidgetItem(npc.get_full_name())
+                name_item.setData(Qt.UserRole, npc)
+                if not npc.is_alive:
+                    name_item.setForeground(Qt.gray)
+                self.table.setItem(row, 0, name_item)
 
-            # 1. Возраст
-            age = npc.get_age(cur_date)
-            age_item = QTableWidgetItem(f"{age} лет")
-            if not npc.is_alive:
-                age_item.setForeground(Qt.gray)
-            self.table.setItem(row, 1, age_item)
+                # 1. Возраст
+                age = npc.get_age(cur_date)
+                age_item = QTableWidgetItem(f"{age} лет")
+                if not npc.is_alive:
+                    age_item.setForeground(Qt.gray)
+                self.table.setItem(row, 1, age_item)
 
-            # 2. Профессия
-            prof_item = QTableWidgetItem(npc.profession)
-            if not npc.is_alive:
-                prof_item.setForeground(Qt.gray)
-            self.table.setItem(row, 2, prof_item)
+                # 2. Профессия
+                prof_item = QTableWidgetItem(npc.profession)
+                if not npc.is_alive:
+                    prof_item.setForeground(Qt.gray)
+                self.table.setItem(row, 2, prof_item)
 
-            # 3. Район
-            d = city.get_district_for_building(npc.home_id) if city else None
-            district_name = d.name if d else "Центральный район"
-            dist_item = QTableWidgetItem(district_name)
-            if not npc.is_alive:
-                dist_item.setForeground(Qt.gray)
-            self.table.setItem(row, 3, dist_item)
+                # 3. Район
+                d = city.get_district_for_building(npc.home_id) if city else None
+                district_name = d.name if d else "Центральный район"
+                dist_item = QTableWidgetItem(district_name)
+                if not npc.is_alive:
+                    dist_item.setForeground(Qt.gray)
+                self.table.setItem(row, 3, dist_item)
 
-            # 4. Деньги
-            money_item = QTableWidgetItem(f"{npc.money:,.0f} ₽")
-            if not npc.is_alive:
-                money_item.setForeground(Qt.gray)
-            self.table.setItem(row, 4, money_item)
+                # 4. Деньги
+                money_item = QTableWidgetItem(f"{npc.money:,.0f} ₽")
+                if not npc.is_alive:
+                    money_item.setForeground(Qt.gray)
+                self.table.setItem(row, 4, money_item)
 
-            # 5. Здоровье
-            health_val = getattr(npc, 'health', 100.0)
-            health_str = f"{int(health_val)}%" if npc.is_alive else "—"
-            health_item = QTableWidgetItem(health_str)
-            if not npc.is_alive:
-                health_item.setForeground(Qt.gray)
-            self.table.setItem(row, 5, health_item)
+                # 5. Здоровье
+                health_val = getattr(npc, 'health', 100.0)
+                health_str = f"{int(health_val)}%" if npc.is_alive else "—"
+                health_item = QTableWidgetItem(health_str)
+                if not npc.is_alive:
+                    health_item.setForeground(Qt.gray)
+                self.table.setItem(row, 5, health_item)
 
-            # 6. Настроение
-            mood_str = f"{int(npc.mood)}%" if npc.is_alive else "—"
-            mood_item = QTableWidgetItem(mood_str)
-            if not npc.is_alive:
-                mood_item.setForeground(Qt.gray)
-            self.table.setItem(row, 6, mood_item)
+                # 6. Настроение
+                mood_str = f"{int(npc.mood)}%" if npc.is_alive else "—"
+                mood_item = QTableWidgetItem(mood_str)
+                if not npc.is_alive:
+                    mood_item.setForeground(Qt.gray)
+                self.table.setItem(row, 6, mood_item)
 
-            # 7. Статус
-            status = npc.state if npc.is_alive else "Умер"
-            state_item = QTableWidgetItem(status)
-            if not npc.is_alive:
-                state_item.setForeground(Qt.gray)
-            self.table.setItem(row, 7, state_item)
+                # 7. Статус
+                status = npc.state if npc.is_alive else "Умер"
+                state_item = QTableWidgetItem(status)
+                if not npc.is_alive:
+                    state_item.setForeground(Qt.gray)
+                self.table.setItem(row, 7, state_item)
+        finally:
+            self.table.setUpdatesEnabled(True)
 
     def on_item_double_clicked(self, item):
         row = item.row()

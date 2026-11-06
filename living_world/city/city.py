@@ -26,6 +26,17 @@ class City:
                 district.add_building(building.id)
         self.buildings.append(building)
 
+    def get_cultural_buildings(self) -> List[Building]:
+        cult_types = {'library', 'cinema', 'theater', 'stadium', 'club', 'park', 'sports'}
+        keywords = ('библиотек', 'кино', 'театр', 'стадион', 'парк', 'музей')
+        res = []
+        for b in self.buildings:
+            if getattr(b, 'b_type', '') in cult_types:
+                res.append(b)
+            elif any(w in b.name.lower() for w in keywords):
+                res.append(b)
+        return res
+
     def add_district(self, district: District):
         self.districts.append(district)
 

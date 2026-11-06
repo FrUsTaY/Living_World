@@ -553,14 +553,13 @@ class VisitCultureAction(Action):
         if hasattr(npc, 'get_life_stage') and npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
             return False
         city = getattr(simulation, 'city', None)
-        if not city:
+        if not city or not city.buildings:
             return False
-        cult_buildings = [
-            b for b in city.buildings
-            if getattr(b, 'b_type', '') in ['library', 'cinema', 'theater', 'stadium', 'club', 'park']
-            or any(w in b.name.lower() for w in ['библиотек', 'кино', 'театр', 'стадион', 'парк', 'музей'])
-        ]
-        return len(cult_buildings) > 0
+        cult_types = {'library', 'cinema', 'theater', 'stadium', 'club', 'park', 'sports'}
+        for b in city.buildings:
+            if getattr(b, 'b_type', '') in cult_types:
+                return True
+        return len(city.get_cultural_buildings()) > 0
 
     def calculate_utility(self, npc, simulation, time_dict) -> float:
         hour = time_dict['hour']
@@ -588,11 +587,7 @@ class VisitCultureAction(Action):
 
     def execute(self, npc, simulation, time_dict):
         city = getattr(simulation, 'city', None)
-        cult_buildings = [
-            b for b in city.buildings
-            if getattr(b, 'b_type', '') in ['library', 'cinema', 'theater', 'stadium', 'club', 'park']
-            or any(w in b.name.lower() for w in ['библиотек', 'кино', 'театр', 'стадион', 'парк', 'музей'])
-        ]
+        cult_buildings = city.get_cultural_buildings() if city else []
         if not cult_buildings:
             return
 

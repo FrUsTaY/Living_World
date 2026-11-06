@@ -7,6 +7,8 @@ class CareForChildAction(Action):
         return "Заботится о ребенке"
 
     def check_preconditions(self, npc, simulation, time_dict) -> bool:
+        if not getattr(simulation, '_has_babies', False):
+            return False
         stage = npc.get_life_stage(simulation.time.current_datetime)
         if stage in [LifeStage.BABY, LifeStage.CHILD, LifeStage.SCHOOL, LifeStage.TEEN, LifeStage.DEAD]:
             return False

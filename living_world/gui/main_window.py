@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import (QMainWindow, QDialog, QWidget, QVBoxLayout, QHBoxLayout,
+from PySide6.QtWidgets import (QApplication, QMainWindow, QDialog, QWidget, QVBoxLayout, QHBoxLayout,
                                QPushButton, QLabel, QTabWidget, QListWidget, QMessageBox,
                                QToolBar, QComboBox)
 from PySide6.QtCore import QTimer, Qt
@@ -122,11 +122,11 @@ class MainWindow(QMainWindow):
             self.timer_interval = 100
             self.ticks_per_update = 1
         elif speed_str == "100x":
-            self.timer_interval = 10
-            self.ticks_per_update = 1
-        elif speed_str == "1000x":
-            self.timer_interval = 10
+            self.timer_interval = 100
             self.ticks_per_update = 10
+        elif speed_str == "1000x":
+            self.timer_interval = 100
+            self.ticks_per_update = 25
 
         self.timer.setInterval(self.timer_interval)
 
@@ -142,6 +142,7 @@ class MainWindow(QMainWindow):
                 current_tab.update_data()
 
             self.update_log()
+            QApplication.processEvents()
 
     def _on_tab_changed(self, index):
         widget = self.tabs.widget(index)
@@ -149,11 +150,20 @@ class MainWindow(QMainWindow):
             widget.update_data()
 
     def update_log(self):
-        self.log_list.clear()
-        display_events = self.sim.events_log[-200:]
-        for ev in display_events:
-            self.log_list.addItem(f"[{ev['time']}] {ev['msg']}")
-        self.log_list.scrollToBottom()
+        curr_len = len(self.sim.events_log)
+        if getattr(self, '_last_log_len', None) == curr_len:
+            return
+        self._last_log_len = curr_len
+
+        self.log_list.setUpdatesEnabled(False)
+        try:
+            self.log_list.clear()
+            display_events = self.sim.events_log[-100:]
+            for ev in display_events:
+                self.log_list.addItem(f"[{ev['time']}] {ev['msg']}")
+            self.log_list.scrollToBottom()
+        finally:
+            self.log_list.setUpdatesEnabled(True)
 
     def show_npc_card(self, npc):
         dialog = NPCCardDialog(npc, self.sim.city, self)
