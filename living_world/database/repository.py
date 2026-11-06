@@ -370,7 +370,7 @@ class Database:
         finally:
             conn.close()
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None, crimes=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None, crimes=None, culture=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -394,6 +394,8 @@ class Database:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("politics", json.dumps(politics)))
             if crimes is not None:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("crimes", json.dumps(crimes)))
+            if culture is not None:
+                cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("culture", json.dumps(culture)))
 
             # Сохраняем образование
             cursor.execute("DELETE FROM educational_institutions")
@@ -643,6 +645,10 @@ class Database:
             row_cr = cursor.fetchone()
             crimes_data = json.loads(row_cr['value']) if row_cr and row_cr['value'] else None
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data, crimes_data
+            cursor.execute("SELECT value FROM meta WHERE key = 'culture'")
+            row_cult = cursor.fetchone()
+            culture_data = json.loads(row_cult['value']) if row_cult and row_cult['value'] else None
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data, crimes_data, culture_data
         finally:
             conn.close()

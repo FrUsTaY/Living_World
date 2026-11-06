@@ -12,7 +12,8 @@ class NPC:
                  hygiene=100.0, stress=0.0, hobby=None, chronotype=None, is_sick=False, sick_days=0, alimony_to_id=None,
                  career_level=1, work_experience_days=0,
                  is_renting=False, mortgage_debt=0.0, mortgage_payment=0.0,
-                 transport_mode=None, has_criminal_record=False, jail_days=0):
+                 transport_mode=None, has_criminal_record=False, jail_days=0,
+                 inspiration_buffer_days=0):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -64,6 +65,7 @@ class NPC:
         self.sick_days = int(sick_days)
         self.has_criminal_record = bool(has_criminal_record)
         self.jail_days = int(jail_days)
+        self.inspiration_buffer_days = int(inspiration_buffer_days)
 
         self._last_state = self.state
 

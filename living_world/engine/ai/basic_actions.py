@@ -538,3 +538,90 @@ class VisitDoctorAction(Action):
                 message=f"💊 {npc.get_full_name()} посетил(а) врача и успешно вылечился(лась) от болезни.",
                 participants=[npc.id]
             )
+
+
+
+class VisitCultureAction(Action):
+    @property
+    def name(self) -> str:
+        return "Культурный досуг"
+
+    def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if not npc.is_alive or getattr(npc, 'jail_days', 0) > 0 or npc.state == "В тюрьме":
+            return False
+        if hasattr(npc, 'get_life_stage') and npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
+        city = getattr(simulation, 'city', None)
+        if not city:
+            return False
+        cult_buildings = [
+            b for b in city.buildings
+            if getattr(b, 'b_type', '') in ['library', 'cinema', 'theater', 'stadium', 'club', 'park']
+            or any(w in b.name.lower() for w in ['библиотек', 'кино', 'театр', 'стадион', 'парк', 'музей'])
+        ]
+        return len(cult_buildings) > 0
+
+    def calculate_utility(self, npc, simulation, time_dict) -> float:
+        hour = time_dict['hour']
+        is_weekend = time_dict.get('day_of_week') in [5, 6] or time_dict.get('is_weekend', False)
+
+        # В рабочие часы будних дней работающие жители заняты на работе
+        if 8 <= hour < 17 and not is_weekend and npc.work_id:
+            return 0.0
+
+        utility = 0.0
+
+        holiday_mgr = getattr(simulation, 'holiday_manager', None)
+        if holiday_mgr and holiday_mgr.get_current_holiday(simulation.time.current_datetime):
+            utility += 40.0
+
+        if getattr(npc, 'stress', 0.0) > 40.0:
+            utility += 30.0
+        if npc.mood < 50.0:
+            utility += 25.0
+
+        if (17 <= hour < 22) or (is_weekend and 10 <= hour < 22):
+            utility += 35.0
+
+        return utility
+
+    def execute(self, npc, simulation, time_dict):
+        city = getattr(simulation, 'city', None)
+        cult_buildings = [
+            b for b in city.buildings
+            if getattr(b, 'b_type', '') in ['library', 'cinema', 'theater', 'stadium', 'club', 'park']
+            or any(w in b.name.lower() for w in ['библиотек', 'кино', 'театр', 'стадион', 'парк', 'музей'])
+        ]
+        if not cult_buildings:
+            return
+
+        import random
+        target_b = random.choice(cult_buildings)
+        npc.current_location = target_b.id
+        b_name_lower = target_b.name.lower()
+
+        if 'библиотек' in b_name_lower or getattr(target_b, 'b_type', '') == 'library':
+            npc.traits['patience'] = min(1.0, npc.traits.get('patience', 0.0) + 0.05)
+            npc.mood = min(100.0, npc.mood + 8.0)
+            npc.stress = max(0.0, getattr(npc, 'stress', 0.0) - 10.0)
+            desc = "Посетил(а) библиотеку, читал(а) литературу"
+        elif any(w in b_name_lower for w in ['кино', 'театр', 'музей']) or getattr(target_b, 'b_type', '') in ['cinema', 'theater']:
+            npc.inspiration_buffer_days = 7
+            npc.mood = min(100.0, npc.mood + 15.0)
+            npc.stress = max(0.0, getattr(npc, 'stress', 0.0) - 20.0)
+            desc = "Посетил(а) кино/театр, получил(а) заряд вдохновения"
+        elif 'стадион' in b_name_lower or getattr(target_b, 'b_type', '') in ['stadium', 'sports']:
+            npc.health = min(100.0, getattr(npc, 'health', 100.0) + 4.0)
+            npc.stress = max(0.0, getattr(npc, 'stress', 0.0) - 15.0)
+            npc.mood = min(100.0, npc.mood + 10.0)
+            desc = "Посетил(а) стадион, участвовал(а) в спортивных состязаниях"
+        else:
+            npc.mood = min(100.0, npc.mood + 12.0)
+            npc.stress = max(0.0, getattr(npc, 'stress', 0.0) - 15.0)
+            desc = "Участвовал(а) в городском фестивале в парке"
+
+        if hasattr(simulation, 'memory_manager'):
+            simulation.memory_manager.add_memory(
+                npc.id, None, "Культура", desc, 0.5, 0.7
+            )

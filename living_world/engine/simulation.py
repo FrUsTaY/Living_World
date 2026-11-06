@@ -49,6 +49,8 @@ class Simulation:
         self.politics_manager = PoliticsManager(self)
         from living_world.engine.justice.crime_manager import CrimeManager
         self.crime_manager = CrimeManager(self)
+        from living_world.engine.culture.holiday_manager import HolidayManager
+        self.holiday_manager = HolidayManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -95,7 +97,8 @@ class Simulation:
             enterprises=enterprises,
             city_treasury=getattr(self.economy_manager, 'city_treasury', 100000.0) if hasattr(self, 'economy_manager') else 100000.0,
             politics=self.politics_manager.to_dict() if hasattr(self, 'politics_manager') else None,
-            crimes=self.crime_manager.to_dict() if hasattr(self, 'crime_manager') else None
+            crimes=self.crime_manager.to_dict() if hasattr(self, 'crime_manager') else None,
+            culture=self.holiday_manager.to_dict() if hasattr(self, 'holiday_manager') else None
         )
 
     def add_npc(self, npc):
@@ -111,6 +114,7 @@ class Simulation:
         # Будем считать, что при вызове update() проходит 1 минута игрового времени
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
+            self.holiday_manager.check_and_trigger_fireworks(self.time.current_datetime)
             self.weather_manager.update_weather(self.time.current_datetime)
             self.city_chronicle.check_and_publish_monthly(self.time.current_datetime)
 
@@ -154,6 +158,7 @@ class Simulation:
                 self._process_daily_health()
                 self.politics_manager.daily_update(self.time.current_datetime)
                 self.crime_manager.daily_update(self.time.current_datetime)
+                self.holiday_manager.daily_update(self.time.current_datetime)
 
             for npc in self.npcs:
                 if not npc.is_alive:
