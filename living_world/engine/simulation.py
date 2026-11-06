@@ -43,6 +43,8 @@ class Simulation:
         self.construction_manager = ConstructionManager(self)
         from living_world.engine.environment.weather_manager import WeatherManager
         self.weather_manager = WeatherManager(self)
+        from living_world.engine.chronicle.city_chronicle import CityChronicle
+        self.city_chronicle = CityChronicle(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -104,6 +106,7 @@ class Simulation:
         if self.time.tick(1):
             time_dict = self.time.get_time_dict()
             self.weather_manager.update_weather(self.time.current_datetime)
+            self.city_chronicle.check_and_publish_monthly(self.time.current_datetime)
 
             # Check for natural death once a day (at midnight, e.g. 00:00)
             is_new_day = (time_dict['hour'] == 0 and time_dict['minute'] == 0)

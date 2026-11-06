@@ -89,6 +89,41 @@ class FamilyManager:
                             participants=[npc.id]
                         )
 
+        # 5. Наследование семейного бизнеса (Семейные династии)
+        if hasattr(self.simulation, 'economy_manager'):
+            econ = self.simulation.economy_manager
+            owned_enterprises = [e for e in econ.enterprises.values() if e.owner_id == npc.id and e.is_active]
+            for ent in owned_enterprises:
+                current_date = self.simulation.time.current_datetime
+                adult_children = [c for c in self.get_children(npc.id) if c.is_alive and c.get_age(current_date) >= 18]
+                heir = None
+                spouse = self.get_spouse(npc.id)
+                if adult_children:
+                    heir = max(adult_children, key=lambda c: c.get_age(current_date))
+                elif spouse and spouse.is_alive:
+                    heir = spouse
+
+                if heir:
+                    ent.owner_id = heir.id
+                    ent.add_employee(heir.id)
+                    if heir.work_id is None or heir.profession == "Безработный":
+                        heir.work_id = ent.building_id
+                        heir.profession = "Руководитель"
+                    if hasattr(self.simulation, 'event_aggregator'):
+                        from living_world.engine.observer.world_event import EventType, EventImportance
+                        self.simulation.event_aggregator.publish_event(
+                            event_type=EventType.ECONOMIC,
+                            importance=EventImportance.HIGH,
+                            message=f"👑 Семейная династия: {heir.get_full_name()} унаследовал(а) предприятие '{ent.name}' после кончины {npc.get_full_name()}.",
+                            participants=[heir.id, npc.id]
+                        )
+                    if hasattr(self.simulation, 'memory_manager'):
+                        self.simulation.memory_manager.add_memory(
+                            heir.id, npc.id, "Наследство бизнеса", f"Унаследовал(а) семейное предприятие '{ent.name}'", 0.9, 0.8
+                        )
+                else:
+                    ent.owner_id = None
+
     def create_family(self, npc_a, npc_b, time_dict):
         family_id = str(uuid.uuid4())
         npc_a.family_id = family_id
