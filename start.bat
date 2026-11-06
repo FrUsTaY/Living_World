@@ -1,6 +1,6 @@
 @echo off
 chcp 65001 >nul
-setlocal
+setlocal enabledelayedexpansion
 cd /d "%~dp0"
 
 echo ========================================================
@@ -8,99 +8,83 @@ echo               Living World - Запуск симуляции
 echo ========================================================
 echo.
 
-:: 1. Поиск системного Python для создания .venv
-set "PYTHON="
+REM 1. Проверяем готовое виртуальное окружение .venv
+if exist ".venv\Scripts\python.exe" (
+    goto :activate_venv
+)
+
+REM 2. Поиск системного Python для создания .venv
+set "SYS_PYTHON="
 
 py -3 --version >nul 2>&1
 if not errorlevel 1 (
-    set "PYTHON=py -3"
-    goto :found_python
+    set "SYS_PYTHON=py -3"
+    goto :create_venv
 )
 
 python --version >nul 2>&1
 if not errorlevel 1 (
-    set "PYTHON=python"
-    goto :found_python
+    set "SYS_PYTHON=python"
+    goto :create_venv
 )
 
 python3 --version >nul 2>&1
 if not errorlevel 1 (
-    set "PYTHON=python3"
-    goto :found_python
+    set "SYS_PYTHON=python3"
+    goto :create_venv
 )
 
 if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" (
-    set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
-    goto :found_python
+    set "SYS_PYTHON=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+    goto :create_venv
 )
 if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" (
-    set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
-    goto :found_python
+    set "SYS_PYTHON=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+    goto :create_venv
 )
 if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" (
-    set "PYTHON=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
-    goto :found_python
-)
-if exist "C:\Python312\python.exe" (
-    set "PYTHON=C:\Python312\python.exe"
-    goto :found_python
-)
-if exist "C:\Python311\python.exe" (
-    set "PYTHON=C:\Python311\python.exe"
-    goto :found_python
-)
-if exist "C:\Python310\python.exe" (
-    set "PYTHON=C:\Python310\python.exe"
-    goto :found_python
+    set "SYS_PYTHON=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+    goto :create_venv
 )
 
-:found_python
-if "%PYTHON%"=="" (
-    if not exist ".venv\Scripts\python.exe" (
-        echo [ОШИБКА] Python не найден в системе!
-        echo Пожалуйста, установите Python 3.10+ с сайта https://www.python.org/
-        echo Обязательно отметьте галочку: "Add python.exe to PATH" при установке.
-        echo.
-        pause
-        exit /b 1
-    )
-)
-
-:: 2. Создание виртуального окружения .venv (если ещё не создано)
-if not exist ".venv\Scripts\activate.bat" (
-    echo [*] Виртуальное окружение не найдено. Создание .venv ...
-    %PYTHON% -m venv .venv
-    if not exist ".venv\Scripts\activate.bat" (
-        echo [ОШИБКА] Не удалось создать виртуальное окружение .venv.
-        echo.
-        pause
-        exit /b 1
-    )
-    echo [+] Виртуальное окружение .venv успешно создано.
+if "%SYS_PYTHON%"=="" (
+    echo [ОШИБКА] Python не найден в системе!
+    echo Установите Python 3.10+ с сайта https://www.python.org/
+    echo Обязательно отметьте: "Add python.exe to PATH" при установке.
     echo.
-)
-
-:: 3. Активация .venv
-echo [*] Активация виртуального окружения .venv ...
-call ".venv\Scripts\activate.bat"
-if errorlevel 1 (
-    echo [ОШИБКА] Не удалось активировать .venv.
     pause
     exit /b 1
 )
 
-:: 4. Установка / обновление зависимостей в .venv
-echo [*] Проверка и установка зависимостей из requirements.txt в .venv ...
-python -m pip install --upgrade pip >nul 2>&1
+:create_venv
+echo [*] Создание виртуального окружения .venv ...
+%SYS_PYTHON% -m venv .venv
+if not exist ".venv\Scripts\activate.bat" (
+    echo [ОШИБКА] Не удалось создать .venv!
+    pause
+    exit /b 1
+)
+echo [+] Окружение .venv создано.
+echo.
+
+:activate_venv
+echo [*] Активация виртуального окружения .venv ...
+call ".venv\Scripts\activate.bat"
+if errorlevel 1 (
+    echo [ОШИБКА] Не удалось активировать .venv!
+    pause
+    exit /b 1
+)
+
+echo [*] Проверка зависимостей из requirements.txt ...
 python -m pip install -r requirements.txt
 if errorlevel 1 (
-    echo [ПРЕДУПРЕЖДЕНИЕ] Возникли замечания при установке некоторых пакетов.
+    echo [ПРЕДУПРЕЖДЕНИЕ] Возникли замечания при проверке пакетов.
 ) else (
-    echo [+] Зависимости актуальны и готовы к работе.
+    echo [+] Зависимости готовы.
 )
 echo.
 
-:: 5. Запуск приложения Living World
 echo [*] Запуск приложения Living World...
 echo ========================================================
 echo.
@@ -113,7 +97,7 @@ echo ========================================================
 if %EXIT_CODE% equ 0 (
     echo Приложение завершило работу штатно.
 ) else (
-    echo Приложение завершилось с кодом ошибки: %EXIT_CODE%
+    echo Код завершения: %EXIT_CODE%
 )
 echo ========================================================
 echo.
