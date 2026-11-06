@@ -625,3 +625,75 @@ class VisitCultureAction(Action):
             simulation.memory_manager.add_memory(
                 npc.id, None, "Культура", desc, 0.5, 0.7
             )
+
+
+
+class WalkPetAction(Action):
+    @property
+    def name(self) -> str:
+        return "Прогулка с питомцем"
+
+    def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
+        from living_world.engine.life_cycle_manager import LifeStage
+        if not npc.is_alive or getattr(npc, 'jail_days', 0) > 0 or npc.state == "В тюрьме":
+            return False
+        if hasattr(npc, 'get_life_stage') and npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
+            return False
+        hm = getattr(simulation, 'household_manager', None)
+        if not hm:
+            return False
+        hh = hm.get_household(npc.household_id) if npc.household_id else None
+        if not hh or not getattr(hh, 'pet', None):
+            return False
+        return True
+
+    def calculate_utility(self, npc, simulation, time_dict) -> float:
+        hour = time_dict['hour']
+        is_weekend = time_dict.get('day_of_week') in [5, 6] or time_dict.get('is_weekend', False)
+        if 8 <= hour < 17 and not is_weekend and npc.work_id:
+            return 0.0
+
+        hm = getattr(simulation, 'household_manager', None)
+        hh = hm.get_household(npc.household_id) if hm and npc.household_id else None
+        pet = getattr(hh, 'pet', None) if hh else None
+        if not pet:
+            return 0.0
+
+        utility = 0.0
+        # Собаки требуют утренней (7-9) и вечерней (18-21) прогулки
+        if pet.get('type') == 'dog' and (7 <= hour <= 9 or 18 <= hour <= 21):
+            utility += 55.0
+        elif pet.get('type') == 'cat' and 19 <= hour <= 22:
+            utility += 35.0
+
+        if getattr(npc, 'stress', 0.0) > 35.0:
+            utility += 30.0
+
+        return utility
+
+    def execute(self, npc, simulation, time_dict):
+        hm = getattr(simulation, 'household_manager', None)
+        hh = hm.get_household(npc.household_id) if hm and npc.household_id else None
+        pet = getattr(hh, 'pet', None) if hh else None
+        if not pet:
+            return
+
+        city = getattr(simulation, 'city', None)
+        if pet.get('type') == 'dog' and city:
+            parks = city.get_places_by_type('park')
+            if parks:
+                npc.current_location = parks[0].id
+                # Социализация между собаководами в парке
+                if hasattr(simulation, 'relationship_manager'):
+                    rm = simulation.relationship_manager
+                    other_dog_walkers = [
+                        o for o in simulation.npcs
+                        if o.is_alive and o.id != npc.id and o.current_location == npc.current_location
+                    ]
+                    if other_dog_walkers:
+                        partner = other_dog_walkers[0]
+                        rm.modify_relationship(npc.id, partner.id, 'familiarity', 8.0)
+                        rm.modify_relationship(npc.id, partner.id, 'affinity', 5.0)
+
+        npc.stress = max(0.0, getattr(npc, 'stress', 0.0) - 25.0)
+        npc.mood = min(100.0, npc.mood + 18.0)

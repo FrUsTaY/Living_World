@@ -13,7 +13,7 @@ class NPC:
                  career_level=1, work_experience_days=0,
                  is_renting=False, mortgage_debt=0.0, mortgage_payment=0.0,
                  transport_mode=None, has_criminal_record=False, jail_days=0,
-                 inspiration_buffer_days=0):
+                 inspiration_buffer_days=0, has_warm_clothes=False):
         self.id = npc_id or str(uuid.uuid4())
         self.first_name = first_name
         self.last_name = last_name
@@ -66,6 +66,7 @@ class NPC:
         self.has_criminal_record = bool(has_criminal_record)
         self.jail_days = int(jail_days)
         self.inspiration_buffer_days = int(inspiration_buffer_days)
+        self.has_warm_clothes = bool(has_warm_clothes)
 
         self._last_state = self.state
 
@@ -156,7 +157,8 @@ class NPC:
             "Ипотека": f"{self.mortgage_debt:,.0f} ₽ ({self.mortgage_payment:,.0f} ₽/день)" if self.mortgage_debt > 0 else "Нет",
             "Транспорт": "Автомобиль" if self.transport_mode == "car" else ("Автобус" if self.transport_mode == "bus" else "Пешком"),
             "Судимость": "Есть" if self.has_criminal_record else "Нет",
-            "Статус заключения": f"В тюрьме ({self.jail_days} дн.)" if self.jail_days > 0 else "На свободе"
+            "Статус заключения": f"В тюрьме ({self.jail_days} дн.)" if self.jail_days > 0 else "На свободе",
+            "Зимняя одежда": "Есть" if self.has_warm_clothes else "Нет"
         }
 
         if city:

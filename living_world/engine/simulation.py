@@ -51,6 +51,8 @@ class Simulation:
         self.crime_manager = CrimeManager(self)
         from living_world.engine.culture.holiday_manager import HolidayManager
         self.holiday_manager = HolidayManager(self)
+        from living_world.engine.property.property_manager import PropertyManager
+        self.property_manager = PropertyManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -98,7 +100,8 @@ class Simulation:
             city_treasury=getattr(self.economy_manager, 'city_treasury', 100000.0) if hasattr(self, 'economy_manager') else 100000.0,
             politics=self.politics_manager.to_dict() if hasattr(self, 'politics_manager') else None,
             crimes=self.crime_manager.to_dict() if hasattr(self, 'crime_manager') else None,
-            culture=self.holiday_manager.to_dict() if hasattr(self, 'holiday_manager') else None
+            culture=self.holiday_manager.to_dict() if hasattr(self, 'holiday_manager') else None,
+            property_data=self.property_manager.to_dict() if hasattr(self, 'property_manager') else None
         )
 
     def add_npc(self, npc):
@@ -159,6 +162,7 @@ class Simulation:
                 self.politics_manager.daily_update(self.time.current_datetime)
                 self.crime_manager.daily_update(self.time.current_datetime)
                 self.holiday_manager.daily_update(self.time.current_datetime)
+                self.property_manager.daily_update(self.time.current_datetime)
 
             for npc in self.npcs:
                 if not npc.is_alive:
@@ -346,7 +350,10 @@ class Simulation:
                 if getattr(npc, 'hygiene', 100.0) < 30.0:
                     sick_prob += 0.01
                 if hasattr(self, 'weather_manager') and self.weather_manager.temperature < 0.0:
-                    sick_prob += 0.012
+                    if not getattr(npc, 'has_warm_clothes', False):
+                        sick_prob += 0.015
+                    else:
+                        sick_prob += 0.002
 
                 if random.random() < sick_prob:
                     npc.is_sick = True

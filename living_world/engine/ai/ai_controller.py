@@ -4,7 +4,7 @@ from living_world.engine.ai.action import Action
 from living_world.engine.ai.basic_actions import (
     SleepAction, EatAction, WorkAction, RelaxAction, PlayAction, 
     SocializeAction, StudyAction, StrollAction, DateAction,
-    HygieneAction, HobbyAction, VisitDoctorAction, VisitCultureAction
+    HygieneAction, HobbyAction, VisitDoctorAction, VisitCultureAction, WalkPetAction
 )
 from living_world.engine.ai.family_actions import CareForChildAction
 
@@ -25,7 +25,8 @@ class AIController:
             HygieneAction(),
             HobbyAction(),
             VisitDoctorAction(),
-            VisitCultureAction()
+            VisitCultureAction(),
+            WalkPetAction()
         ]
 
     def choose_and_execute_action(self, npc, time_dict):

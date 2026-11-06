@@ -54,7 +54,8 @@ CREATE TABLE IF NOT EXISTS npcs (
     mortgage_payment REAL DEFAULT 0.0,
     transport_mode TEXT DEFAULT 'foot',
     has_criminal_record INTEGER DEFAULT 0,
-    jail_days INTEGER DEFAULT 0
+    jail_days INTEGER DEFAULT 0,
+    has_warm_clothes INTEGER DEFAULT 0
 );
 
 CREATE TABLE IF NOT EXISTS buildings (
@@ -305,6 +306,8 @@ class Database:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN has_criminal_record INTEGER DEFAULT 0")
             if 'jail_days' not in columns:
                 cursor.execute("ALTER TABLE npcs ADD COLUMN jail_days INTEGER DEFAULT 0")
+            if 'has_warm_clothes' not in columns:
+                cursor.execute("ALTER TABLE npcs ADD COLUMN has_warm_clothes INTEGER DEFAULT 0")
 
             cursor.execute("PRAGMA table_info(buildings)")
             columns_b = [info[1] for info in cursor.fetchall()]
@@ -335,6 +338,14 @@ class Database:
             columns_hh = [info[1] for info in cursor.fetchall()]
             if 'stress' not in columns_hh:
                 cursor.execute("ALTER TABLE households ADD COLUMN stress REAL DEFAULT 0.0")
+            cursor.execute("PRAGMA table_info(households)")
+            columns_hh = [info[1] for info in cursor.fetchall()]
+            if 'appliances' not in columns_hh:
+                cursor.execute("ALTER TABLE households ADD COLUMN appliances TEXT DEFAULT '[]'")
+            if 'pet' not in columns_hh:
+                cursor.execute("ALTER TABLE households ADD COLUMN pet TEXT DEFAULT NULL")
+            if 'home_comfort' not in columns_hh:
+                cursor.execute("ALTER TABLE households ADD COLUMN home_comfort REAL DEFAULT 40.0")
 
             cursor.execute('''CREATE TABLE IF NOT EXISTS enterprises (
                 id TEXT PRIMARY KEY,
@@ -370,7 +381,7 @@ class Database:
         finally:
             conn.close()
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None, crimes=None, culture=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None, crimes=None, culture=None, property_data=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -396,6 +407,8 @@ class Database:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("crimes", json.dumps(crimes)))
             if culture is not None:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("culture", json.dumps(culture)))
+            if property_data is not None:
+                cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("property_data", json.dumps(property_data)))
 
             # Сохраняем образование
             cursor.execute("DELETE FROM educational_institutions")
@@ -430,13 +443,13 @@ class Database:
             for h in households:
                 if isinstance(h, dict):
                     cursor.execute(
-                        "INSERT INTO households (id, home_id, creation_time, stress) VALUES (?, ?, ?, ?)",
-                        (h['id'], h['home_id'], h['creation_time'], h.get('stress', 0.0))
+                        "INSERT INTO households (id, home_id, creation_time, stress, appliances, pet, home_comfort) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (h['id'], h['home_id'], h['creation_time'], h.get('stress', 0.0), json.dumps(h.get('appliances', [])), json.dumps(h.get('pet')) if h.get('pet') else None, h.get('home_comfort', 40.0))
                     )
                 else:
                     cursor.execute(
-                        "INSERT INTO households (id, home_id, creation_time, stress) VALUES (?, ?, ?, ?)",
-                        (h.id, h.home_id, h.creation_time, getattr(h, 'stress', 0.0))
+                        "INSERT INTO households (id, home_id, creation_time, stress, appliances, pet, home_comfort) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (h.id, h.home_id, h.creation_time, getattr(h, 'stress', 0.0), json.dumps(getattr(h, 'appliances', [])), json.dumps(getattr(h, 'pet', None)) if getattr(h, 'pet', None) else None, getattr(h, 'home_comfort', 40.0))
                     )
 
             # Сохраняем здания
@@ -452,8 +465,8 @@ class Database:
             for npc in npcs:
                 cursor.execute(
                     """INSERT INTO npcs
-                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode, has_criminal_record, jail_days)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (id, first_name, last_name, gender, profession, home_id, work_id, money, hunger, energy, mood, current_location, state, trait_sociability, trait_friendliness, trait_conflict, trait_empathy, trait_boldness, trait_patience, trait_ambition, trait_frugality, trait_diligence, health, family_id, date_of_birth, date_of_death, is_alive, current_education_id, education_status, mother_id, father_id, children_desire, household_id, dating_partner_id, hygiene, stress, hobby, chronotype, is_sick, sick_days, alimony_to_id, career_level, work_experience_days, is_renting, mortgage_debt, mortgage_payment, transport_mode, has_criminal_record, jail_days, has_warm_clothes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (npc.id, npc.first_name, npc.last_name, npc.gender, npc.profession,
                      npc.home_id, npc.work_id, npc.money, npc.hunger, npc.energy, npc.mood, npc.current_location, npc.state,
                      npc.traits.get('sociability', 0.0) if hasattr(npc, 'traits') else 0.0,
@@ -491,7 +504,8 @@ class Database:
                      getattr(npc, 'mortgage_payment', 0.0),
                      getattr(npc, 'transport_mode', 'foot'),
                      1 if getattr(npc, 'has_criminal_record', False) else 0,
-                     getattr(npc, 'jail_days', 0))
+                     getattr(npc, 'jail_days', 0),
+                     1 if getattr(npc, 'has_warm_clothes', False) else 0)
                 )
 
             # Сохраняем семьи
@@ -649,6 +663,10 @@ class Database:
             row_cult = cursor.fetchone()
             culture_data = json.loads(row_cult['value']) if row_cult and row_cult['value'] else None
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data, crimes_data, culture_data
+            cursor.execute("SELECT value FROM meta WHERE key = 'property_data'")
+            row_prop = cursor.fetchone()
+            property_data = json.loads(row_prop['value']) if row_prop and row_prop['value'] else None
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data, crimes_data, culture_data, property_data
         finally:
             conn.close()

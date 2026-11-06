@@ -192,7 +192,10 @@ class MainWindow(QMainWindow):
                 politics_data = None
                 crimes_data = None
                 culture_data = None
-                if len(load_res) >= 18:
+                property_data = None
+                if len(load_res) >= 19:
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury, politics_data, crimes_data, culture_data, property_data = load_res[:19]
+                elif len(load_res) == 18:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury, politics_data, crimes_data, culture_data = load_res[:18]
                 elif len(load_res) == 17:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury, politics_data, crimes_data = load_res[:17]
@@ -226,6 +229,8 @@ class MainWindow(QMainWindow):
                     self.sim.crime_manager.load_from_dict(crimes_data)
                 if hasattr(self.sim, 'holiday_manager') and culture_data:
                     self.sim.holiday_manager.load_from_dict(culture_data)
+                if hasattr(self.sim, 'property_manager') and property_data:
+                    self.sim.property_manager.load_from_dict(property_data)
 
                 from living_world.city.city import Building
                 for b in b_dicts:
@@ -295,6 +300,7 @@ class MainWindow(QMainWindow):
                     npc.transport_mode = nd.get('transport_mode', 'foot')
                     npc.has_criminal_record = bool(nd.get('has_criminal_record', 0))
                     npc.jail_days = int(nd.get('jail_days', 0))
+                    npc.has_warm_clothes = bool(nd.get('has_warm_clothes', 0))
                     npc.current_location = nd['current_location']
                     npc.state = nd['state']
                     npc._last_state = nd['state']
