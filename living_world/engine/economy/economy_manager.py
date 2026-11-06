@@ -91,8 +91,9 @@ class EconomyManager:
             ent.pay_expense(earned)
             ent.add_employee(npc.id)
 
-        # 13% НДФЛ в городскую казну
-        tax = earned * 0.13
+        pol = getattr(self.simulation, 'politics_manager', None)
+        tax_rate = pol.get_tax_rate() if pol else 0.13
+        tax = earned * tax_rate
         net = earned - tax
         self.city_treasury += tax
         npc.money += net
@@ -140,8 +141,9 @@ class EconomyManager:
                 commercial_revenue = round(ent.daily_expenses * 1.30, 2)
                 ent.receive_revenue(commercial_revenue)
 
-        # 1. Пенсии пожилым жителям (из городской казны)
-        daily_pension = 650.0  # ~20 000 ₽ / месяц
+        # 1. Пенсии пожилым жителям (из городской казны с учетом политики Мэра)
+        pol = getattr(self.simulation, 'politics_manager', None)
+        daily_pension = pol.get_pension_amount() if pol else 650.0
         for npc in self.simulation.npcs:
             if npc.is_alive and npc.profession == "Пенсионер":
                 if self.city_treasury >= daily_pension:
@@ -428,11 +430,13 @@ class EconomyManager:
                             )
 
         # 2. Выплата детских пособий матерям с младенцами
+        pol = getattr(self.simulation, 'politics_manager', None)
+        allowance = pol.get_child_allowance() if pol else 200.0
         current_date = self.simulation.time.current_datetime
         for npc in self.simulation.npcs:
             if npc.is_alive and npc.gender == 'Ж':
                 children = self.simulation.family_manager.get_children(npc.id) if hasattr(self.simulation, 'family_manager') else []
                 has_baby = any(c.is_alive and c.get_life_stage(current_date) == LifeStage.BABY for c in children)
-                if has_baby and self.city_treasury >= 200.0:
-                    self.city_treasury -= 200.0
-                    npc.money += 200.0
+                if has_baby and self.city_treasury >= allowance:
+                    self.city_treasury -= allowance
+                    npc.money += allowance

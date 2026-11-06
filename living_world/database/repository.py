@@ -364,7 +364,7 @@ class Database:
         finally:
             conn.close()
 
-    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None):
+    def save_world(self, sim_time, npcs, buildings, events, families=None, relationships=None, memories=None, educational_institutions=None, education_programs=None, education_history=None, pregnancies=None, households=None, world_events=None, enterprises=None, city_treasury=None, politics=None):
         if memories is None: memories = []
         if families is None: families = []
         if relationships is None: relationships = []
@@ -384,6 +384,8 @@ class Database:
             cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("sim_time", json.dumps(sim_time)))
             if city_treasury is not None:
                 cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("city_treasury", str(city_treasury)))
+            if politics is not None:
+                cursor.execute("INSERT OR REPLACE INTO meta (key, value) VALUES (?, ?)", ("politics", json.dumps(politics)))
 
             # Сохраняем образование
             cursor.execute("DELETE FROM educational_institutions")
@@ -623,6 +625,10 @@ class Database:
             row_tr = cursor.fetchone()
             city_treasury = float(row_tr['value']) if row_tr else 100000.0
 
-            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury
+            cursor.execute("SELECT value FROM meta WHERE key = 'politics'")
+            row_pol = cursor.fetchone()
+            politics_data = json.loads(row_pol['value']) if row_pol and row_pol['value'] else None
+
+            return sim_time, buildings, npcs, events, families, relationships, memories, educational_institutions, education_programs, education_history, pregnancies, households, world_events, enterprises, city_treasury, politics_data
         finally:
             conn.close()

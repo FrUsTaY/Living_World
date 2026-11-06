@@ -45,6 +45,8 @@ class Simulation:
         self.weather_manager = WeatherManager(self)
         from living_world.engine.chronicle.city_chronicle import CityChronicle
         self.city_chronicle = CityChronicle(self)
+        from living_world.engine.politics.politics_manager import PoliticsManager
+        self.politics_manager = PoliticsManager(self)
 
         # Observer 3.5.1
         self.event_journal = EventJournal()
@@ -89,7 +91,8 @@ class Simulation:
             households=households,
             world_events=self.event_journal.to_dicts(),
             enterprises=enterprises,
-            city_treasury=getattr(self.economy_manager, 'city_treasury', 100000.0) if hasattr(self, 'economy_manager') else 100000.0
+            city_treasury=getattr(self.economy_manager, 'city_treasury', 100000.0) if hasattr(self, 'economy_manager') else 100000.0,
+            politics=self.politics_manager.to_dict() if hasattr(self, 'politics_manager') else None
         )
 
     def add_npc(self, npc):
@@ -143,6 +146,7 @@ class Simulation:
                 self.autosave_manager.check_and_autosave(time_dict['day'])
                 self.construction_manager.evaluate_city_growth()
                 self._process_daily_health()
+                self.politics_manager.daily_update(self.time.current_datetime)
 
             for npc in self.npcs:
                 if not npc.is_alive:

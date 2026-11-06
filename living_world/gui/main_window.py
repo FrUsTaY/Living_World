@@ -189,7 +189,10 @@ class MainWindow(QMainWindow):
             try:
                 load_res = db.load_world()
                 city_treasury = 100000.0
-                if len(load_res) >= 15:
+                politics_data = None
+                if len(load_res) >= 16:
+                    time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury, politics_data = load_res[:16]
+                elif len(load_res) == 15:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts, city_treasury = load_res[:15]
                 elif len(load_res) == 14:
                     time_dict, b_dicts, npc_dicts, events, families, relationships, memories, edu_inst_dicts, edu_prog_dicts, edu_hist_dicts, pregnancies_dicts, households_dicts, world_events_dicts, enterprises_dicts = load_res
@@ -211,6 +214,8 @@ class MainWindow(QMainWindow):
                 self.sim.time.set_time_from_dict(time_dict)
                 if hasattr(self.sim, 'economy_manager'):
                     self.sim.economy_manager.city_treasury = float(city_treasury)
+                if hasattr(self.sim, 'politics_manager') and politics_data:
+                    self.sim.politics_manager.load_from_dict(politics_data)
 
                 from living_world.city.city import Building
                 for b in b_dicts:
