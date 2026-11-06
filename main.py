@@ -20,6 +20,7 @@ def main():
             window.pop_tab,
             window.fam_tab,
             window.city_tab,
+            window.map_tab,
             window.stats_tab,
             window.history_tab,
             window.events_tab,
