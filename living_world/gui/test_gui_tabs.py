@@ -22,13 +22,14 @@ def qapp():
 
 def test_main_window_all_eight_tabs(qapp):
     win = MainWindow()
-    assert win.tabs.count() == 8
+    assert win.tabs.count() == 9
 
     expected_titles = [
         "Мир",
         "Жители",
         "Семьи",
         "Город",
+        "Карта города",
         "Статистика",
         "История",
         "События",

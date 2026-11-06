@@ -13,6 +13,7 @@ from living_world.gui.tabs.stats_tab import StatsTab
 from living_world.gui.tabs.history_tab import HistoryTab
 from living_world.gui.tabs.events_tab import EventsTab
 from living_world.gui.tabs.settings_tab import SettingsTab
+from living_world.gui.tabs.city_map_tab import CityMapTab
 from living_world.gui.dialogs.npc_card import NPCCardDialog
 from living_world.gui.dialogs.load_world import LoadWorldDialog
 from living_world.database.repository import Database
@@ -81,6 +82,7 @@ class MainWindow(QMainWindow):
         self.pop_tab = PopulationTab(self.sim, self)
         self.fam_tab = FamiliesTab(self.sim, self)
         self.city_tab = CityTab(self.sim, self)
+        self.map_tab = CityMapTab(self.sim, self)
         self.stats_tab = StatsTab(self.sim, self)
         self.history_tab = HistoryTab(self.sim, self)
         self.events_tab = EventsTab(self.sim, self)
@@ -90,6 +92,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.pop_tab, "Жители")
         self.tabs.addTab(self.fam_tab, "Семьи")
         self.tabs.addTab(self.city_tab, "Город")
+        self.tabs.addTab(self.map_tab, "Карта города")
         self.tabs.addTab(self.stats_tab, "Статистика")
         self.tabs.addTab(self.history_tab, "История")
         self.tabs.addTab(self.events_tab, "События")
@@ -159,12 +162,12 @@ class MainWindow(QMainWindow):
     def new_world(self):
         self.sim.close()
         self.sim = Simulation()
-        for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
+        for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.map_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
             tab.simulation = self.sim
 
         generate_initial_world(self.sim.city, self.sim, 25)
 
-        for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
+        for tab in [self.world_tab, self.pop_tab, self.fam_tab, self.city_tab, self.map_tab, self.stats_tab, self.history_tab, self.events_tab, self.settings_tab]:
             if hasattr(tab, 'update_data'):
                 tab.update_data()
 
