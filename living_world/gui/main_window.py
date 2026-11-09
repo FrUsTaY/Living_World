@@ -128,11 +128,11 @@ class MainWindow(QMainWindow):
             self.timer_interval = 100
             self.ticks_per_update = 1
         elif speed_str == "100x":
-            self.timer_interval = 40
-            self.ticks_per_update = 4
+            self.timer_interval = 50
+            self.ticks_per_update = 5
         elif speed_str == "1000x":
-            self.timer_interval = 30
-            self.ticks_per_update = 30
+            self.timer_interval = 50
+            self.ticks_per_update = 50
 
         self.timer.setInterval(self.timer_interval)
 
@@ -148,7 +148,7 @@ class MainWindow(QMainWindow):
 
             import time
             now = time.monotonic()
-            ui_interval = 0.3 if self.ticks_per_update > 1 else 0.0
+            ui_interval = 0.5 if self.ticks_per_update >= 50 else (0.25 if self.ticks_per_update > 1 else 0.0)
             if (now - self._last_ui_update) >= ui_interval:
                 self._last_ui_update = now
                 current_tab = self.tabs.currentWidget()

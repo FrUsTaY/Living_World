@@ -59,7 +59,6 @@ class EatAction(Action):
         return "Ест"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
             return False
         return True
@@ -94,7 +93,6 @@ class WorkAction(Action):
         return "Работает"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
             return False
         return npc.work_id is not None
@@ -163,7 +161,6 @@ class RelaxAction(Action):
         return "Отдыхает"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
             return False
         return True
@@ -228,7 +225,6 @@ class SocializeAction(Action):
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
         if not npc.is_alive: return False
-        from living_world.engine.life_cycle_manager import LifeStage
         if npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
             return False
         return npc.energy >= 20 and npc.hunger >= 20
@@ -327,7 +323,6 @@ class StrollAction(Action):
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
         if not npc.is_alive: return False
-        from living_world.engine.life_cycle_manager import LifeStage
         if npc.get_life_stage(simulation.time.current_datetime) in [LifeStage.BABY, LifeStage.CHILD]:
             return False
         return npc.energy >= 20 and npc.hunger >= 20
@@ -414,7 +409,6 @@ class HygieneAction(Action):
         return "Принимает душ"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if not npc.is_alive or npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
             return False
         return True
@@ -447,7 +441,6 @@ class HobbyAction(Action):
         return "Занимается хобби"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if not npc.is_alive or npc.get_life_stage(simulation.time.current_datetime) in [LifeStage.BABY, LifeStage.CHILD]:
             return False
         return not getattr(npc, 'is_sick', False) and npc.energy >= 15 and npc.hunger >= 20
@@ -547,7 +540,6 @@ class VisitCultureAction(Action):
         return "Культурный досуг"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if not npc.is_alive or getattr(npc, 'jail_days', 0) > 0 or npc.state == "В тюрьме":
             return False
         if hasattr(npc, 'get_life_stage') and npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:
@@ -629,7 +621,6 @@ class WalkPetAction(Action):
         return "Прогулка с питомцем"
 
     def check_preconditions(self, npc, simulation, time_dict=None) -> bool:
-        from living_world.engine.life_cycle_manager import LifeStage
         if not npc.is_alive or getattr(npc, 'jail_days', 0) > 0 or npc.state == "В тюрьме":
             return False
         if hasattr(npc, 'get_life_stage') and npc.get_life_stage(simulation.time.current_datetime) == LifeStage.BABY:

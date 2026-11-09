@@ -17,8 +17,10 @@ class City:
     def __init__(self):
         self.buildings: List[Building] = []
         self.districts: List[District] = []
+        self._cultural_cache: Optional[List[Building]] = None
 
     def add_building(self, building: Building, district_id: Optional[str] = None):
+        self._cultural_cache = None
         if district_id:
             building.district_id = district_id
             district = self.get_district(district_id)
@@ -27,6 +29,8 @@ class City:
         self.buildings.append(building)
 
     def get_cultural_buildings(self) -> List[Building]:
+        if getattr(self, '_cultural_cache', None) is not None and getattr(self, '_cultural_cache_buildings', None) == self.buildings:
+            return self._cultural_cache
         cult_types = {'library', 'cinema', 'theater', 'stadium', 'club', 'park', 'sports'}
         keywords = ('библиотек', 'кино', 'театр', 'стадион', 'парк', 'музей')
         res = []
@@ -35,6 +39,8 @@ class City:
                 res.append(b)
             elif any(w in b.name.lower() for w in keywords):
                 res.append(b)
+        self._cultural_cache = res
+        self._cultural_cache_buildings = list(self.buildings)
         return res
 
     def add_district(self, district: District):

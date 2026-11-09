@@ -1,15 +1,25 @@
 from living_world.engine.event_bus import bus
+from living_world.engine.social.compatibility import CompatibilityManager
 import math
 
 class RelationshipManager:
     def __init__(self, simulation):
         self.simulation = simulation
         self.relationships = {}
+        self._by_source = {}
+        self._compat_cache = {}
+
+    def _set_relationship(self, key, rel_data):
+        self.relationships[key] = rel_data
+        source_id, target_id = key
+        if source_id not in self._by_source:
+            self._by_source[source_id] = {}
+        self._by_source[source_id][target_id] = rel_data
 
     def get_relationship(self, source_id, target_id):
         key = (source_id, target_id)
         if key not in self.relationships:
-            self.relationships[key] = {
+            rel = {
                 'source_npc_id': source_id,
                 'target_npc_id': target_id,
                 'familiarity': 0.0,
@@ -24,6 +34,7 @@ class RelationshipManager:
                 'initiations_sent': 0,
                 'initiations_received': 0
             }
+            self._set_relationship(key, rel)
 
         rel = self.relationships[key]
         return self._apply_lazy_decay(rel, source_id)
@@ -33,17 +44,16 @@ class RelationshipManager:
         last_contact = rel_dict.get('last_interaction_time', current_time)
         last_meaningful = rel_dict.get('last_meaningful_interaction_time', current_time)
 
-        days_since_contact = (current_time - last_contact) / (24 * 60.0)
+        days_since_contact = (current_time - last_contact) / 1440.0
+        days_passed_meaningful = (current_time - last_meaningful) / 1440.0
+
+        if days_passed_meaningful <= 0.02 and days_since_contact <= 0.02:
+            return rel_dict
 
         decayed_rel = rel_dict.copy()
 
         if days_since_contact > 0.5:
             decayed_rel['daily_interactions_count'] = 0
-
-        days_passed_meaningful = (current_time - last_meaningful) / (24 * 60.0)
-
-        if days_passed_meaningful <= 0 and days_since_contact <= 0:
-            return decayed_rel
 
         target_id = rel_dict['target_npc_id']
 
@@ -54,12 +64,16 @@ class RelationshipManager:
         source_npc = self._npc_cache.get(source_id)
         target_npc = self._npc_cache.get(target_id)
 
-        comp = 0.0
-        if source_npc and target_npc:
-            from living_world.engine.social.compatibility import CompatibilityManager
-            comp = CompatibilityManager.calculate_compatibility(source_npc, target_npc)
+        comp = self._compat_cache.get((source_id, target_id))
+        if comp is None:
+            if source_npc and target_npc:
+                comp = CompatibilityManager.calculate_compatibility(source_npc, target_npc)
+            else:
+                comp = 0.0
+            self._compat_cache[(source_id, target_id)] = comp
 
-        active_links = sum(1 for (s, t), r in self.relationships.items() if s == source_id and (abs(r.get('affinity', 0)) > 30 or r.get('romantic_interest', 0) > 30 or r.get('trust', 0) > 30))
+        source_rels = self._by_source.get(source_id, {})
+        active_links = sum(1 for r in source_rels.values() if (abs(r.get('affinity', 0)) > 30 or r.get('romantic_interest', 0) > 30 or r.get('trust', 0) > 30))
         load_penalty = (active_links ** 1.8) / 40000.0
 
         sent = rel_dict.get('initiations_sent', 0)
@@ -125,21 +139,17 @@ class RelationshipManager:
         return base_val * factor
 
     def get_all_relationships_for(self, source_id):
-        rels = []
-        for (src, _), rel in self.relationships.items():
-            if src == source_id:
-                rels.append(self._apply_lazy_decay(rel, source_id))
-        return rels
+        source_rels = self._by_source.get(source_id, {})
+        return [self._apply_lazy_decay(rel, source_id) for rel in source_rels.values()]
 
     def modify_relationship(self, source_id, target_id, axis, delta):
         rel_decayed = self.get_relationship(source_id, target_id)
-
         key = (source_id, target_id)
 
         current_time = self.simulation.time.get_total_minutes()
         rel_decayed['last_interaction_time'] = current_time
 
-        self.relationships[key] = rel_decayed
+        self._set_relationship(key, rel_decayed)
         rel = self.relationships[key]
 
         old_val = rel[axis]
@@ -157,7 +167,7 @@ class RelationshipManager:
     def touch_relationship(self, source_id, target_id, initiator=False, is_meaningful=False):
         rel_decayed = self.get_relationship(source_id, target_id)
         key = (source_id, target_id)
-        self.relationships[key] = rel_decayed
+        self._set_relationship(key, rel_decayed)
 
         current_time = self.simulation.time.get_total_minutes()
         self.relationships[key]['last_interaction_time'] = current_time
@@ -178,13 +188,14 @@ class RelationshipManager:
 
     def load_relationships(self, loaded_relationships):
         self.relationships.clear()
+        self._by_source.clear()
         for rel in loaded_relationships:
             key = (rel['source_npc_id'], rel['target_npc_id'])
             rel_data = {k: v for k, v in rel.items() if k != 'id'}
             if 'initiations_sent' not in rel_data:
                 rel_data['initiations_sent'] = 0
                 rel_data['initiations_received'] = 0
-            self.relationships[key] = rel_data
+            self._set_relationship(key, rel_data)
 
     def get_all_relationships(self):
         return list(self.relationships.values())

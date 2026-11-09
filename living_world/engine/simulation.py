@@ -15,7 +15,8 @@ from living_world.engine.autosave_manager import AutosaveManager
 from living_world.engine.urban.construction_manager import ConstructionManager
 from living_world.engine.observer.event_journal import EventJournal
 from living_world.engine.observer.event_aggregator import EventAggregator
-from living_world.engine.observer.world_event import EventType, EventImportance
+from living_world.engine.observer.world_event import EventType, EventImportance, has_emoji
+from living_world.engine.life_cycle_manager import LifeStage, LifeCycleManager
 
 class Simulation:
     def __init__(self):
@@ -70,12 +71,15 @@ class Simulation:
 
     def _on_log_event(self, msg):
         event = {"time": self.time.format_time(), "msg": msg}
-        self.events_log.append(event)
         self.full_history.append(event)
-        if len(self.events_log) > 200:
-            self.events_log.pop(0)
         if len(self.full_history) > 1000:
             self.full_history.pop(0)
+
+        # Во вкладку 'События' (events_log) пишутся только события со смайликами
+        if has_emoji(msg):
+            self.events_log.append(event)
+            if len(self.events_log) > 200:
+                self.events_log.pop(0)
 
     def save_to_file(self, file_path: str):
         from living_world.database.repository import Database

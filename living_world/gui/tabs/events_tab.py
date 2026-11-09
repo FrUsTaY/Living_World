@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                                QListWidget, QComboBox, QCheckBox, QPushButton)
 from PySide6.QtCore import Qt
+from living_world.engine.observer.world_event import has_emoji
 
 class EventsTab(QWidget):
     """
@@ -44,6 +45,8 @@ class EventsTab(QWidget):
         displayed = []
         for ev in reversed(events):
             msg = ev.get("msg", "")
+            if not has_emoji(msg):
+                continue
             if filter_idx == 1 and not any(mark in msg for mark in ["женился", "родил", "скончался", "познакомился", "встреч", "рабо"]):
                 continue
             elif filter_idx == 2 and not any(mark in msg for mark in ["₽", "дивиденд", "зарплат", "магазин", "предприят", "кафе"]):

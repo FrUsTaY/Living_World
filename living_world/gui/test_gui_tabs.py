@@ -67,7 +67,7 @@ def test_history_and_events_tabs(qapp):
     sim.event_aggregator.publish_event(
         event_type=EventType.ECONOMIC,
         importance=EventImportance.CRITICAL,
-        message="Открыто новое городское предприятие!",
+        message="🏢 Открыто новое городское предприятие!",
         participants=[]
     )
 

@@ -78,3 +78,21 @@ class WorldEvent:
             data=data.get("data", {}),
             event_id=data.get("id")
         )
+
+
+import unicodedata
+
+def has_emoji(text: str) -> bool:
+    if not text:
+        return False
+    for ch in text:
+        cat = unicodedata.category(ch)
+        code = ord(ch)
+        if (
+            cat in ('So', 'Sk')
+            or (0x2600 <= code <= 0x27BF)
+            or (0x1F300 <= code <= 0x1FAFF)
+            or ch in '✝💍👶🛋🚗💼🎓💾⚠🎉🏛⚖🔫👮🕯🔥🌙☀️'
+        ):
+            return True
+    return False

@@ -1,5 +1,6 @@
 import math
 from living_world.engine.event_bus import bus
+from living_world.engine.life_cycle_manager import LifeStage
 from living_world.engine.social.compatibility import CompatibilityManager
 import random
 
@@ -18,7 +19,6 @@ class SocialManager:
         location_groups = {}
         for npc in self.simulation.npcs:
             if not getattr(npc, 'is_available_for_social', lambda: False)(): continue
-            from living_world.engine.life_cycle_manager import LifeStage
             if npc.get_life_stage(self.simulation.time.current_datetime) == LifeStage.BABY: continue
             loc = npc.current_location
             if not loc: continue
