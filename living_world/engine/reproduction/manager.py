@@ -94,11 +94,11 @@ class ReproductionManager:
             self.simulation.event_aggregator.publish_event(
                 event_type=EventType.PREGNANCY,
                 importance=EventImportance.MEDIUM,
-                message=f"{mother.get_full_name()} узнала, что ждёт ребёнка!",
+                message=f"🤰 {mother.get_full_name()} узнала, что ждёт ребёнка!",
                 participants=[mother.id, father.id]
             )
         else:
-            bus.publish("log_event", f"{mother.get_full_name()} узнала, что ждёт ребёнка!")
+            bus.publish("log_event", f"🤰 {mother.get_full_name()} узнала, что ждёт ребёнка!")
         return p
 
     def update(self):
@@ -194,12 +194,12 @@ class ReproductionManager:
             self.simulation.event_aggregator.publish_event(
                 event_type=EventType.BIRTH,
                 importance=EventImportance.CRITICAL,
-                message=f"У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!",
+                message=f"👶 У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!",
                 participants=participants,
                 data={"child_id": baby.id}
             )
         else:
-            bus.publish("log_event", f"У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!")
+            bus.publish("log_event", f"👶 У {mother.get_full_name()} родился ребёнок — {baby.get_full_name()}!")
 
     def load_pregnancies(self, pregnancies_data):
         self.active_pregnancies = []

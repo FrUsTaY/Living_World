@@ -258,7 +258,7 @@ class SocialManager:
                         self.simulation.event_aggregator.publish_event(
                             event_type=EventType.FRIENDSHIP_START,
                             importance=EventImportance.MEDIUM,
-                            message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} стали хорошими друзьями.",
+                            message=f"🤝 {npc_a.get_full_name()} и {npc_b.get_full_name()} стали хорошими друзьями.",
                             participants=[npc_a.id, npc_b.id]
                         )
 
@@ -301,7 +301,7 @@ class SocialManager:
                         self.simulation.event_aggregator.publish_event(
                             event_type=EventType.FRIENDSHIP_START,
                             importance=EventImportance.MEDIUM,
-                            message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} стали хорошими друзьями.",
+                            message=f"🤝 {npc_a.get_full_name()} и {npc_b.get_full_name()} стали хорошими друзьями.",
                             participants=[npc_a.id, npc_b.id]
                         )
 
@@ -355,7 +355,7 @@ class SocialManager:
                     self.simulation.event_aggregator.publish_event(
                         event_type=EventType.CONFLICT_MAJOR if is_major else EventType.CONFLICT_MINOR,
                         importance=EventImportance.HIGH if is_major else EventImportance.LOW,
-                        message=f"{event_title} между {npc_a.first_name} и {npc_b.first_name}.",
+                        message=f"⚡ {event_title} между {npc_a.first_name} и {npc_b.first_name}.",
                         participants=[npc_a.id, npc_b.id, household_id],
                         data={"conflict_type": event_title}
                     )
@@ -396,7 +396,7 @@ class SocialManager:
                         self.simulation.event_aggregator.publish_event(
                             event_type=EventType.RELATIONSHIP_START,
                             importance=EventImportance.HIGH,
-                            message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} начали встречаться!",
+                            message=f"💖 {npc_a.get_full_name()} и {npc_b.get_full_name()} начали встречаться!",
                             participants=[npc_a.id, npc_b.id]
                         )
                 elif success_b > 15 and random.random() < 0.25:
@@ -459,7 +459,7 @@ class SocialManager:
                     self.simulation.event_aggregator.publish_event(
                         event_type=EventType.SOCIAL_INTERACTION,
                         importance=EventImportance.LOW,
-                        message=f"{npc_a.get_full_name()} принес(ла) извинения {npc_b.get_full_name()}, разногласия улажены.",
+                        message=f"🕊 {npc_a.get_full_name()} принес(ла) извинения для {npc_b.get_full_name()}, разногласия улажены.",
                         participants=[npc_a.id, npc_b.id]
                     )
             else:
@@ -485,7 +485,7 @@ class SocialManager:
                     self.simulation.event_aggregator.publish_event(
                         event_type=EventType.ECONOMIC,
                         importance=EventImportance.LOW,
-                        message=f"{npc_a.get_full_name()} оказал(а) материальную поддержку {npc_b.get_full_name()}.",
+                        message=f"🤝 {npc_a.get_full_name()} оказал(а) материальную поддержку для {npc_b.get_full_name()}.",
                         participants=[npc_a.id, npc_b.id]
                     )
 
@@ -505,7 +505,7 @@ class SocialManager:
                 self.simulation.event_aggregator.publish_event(
                     event_type=EventType.RELATIONSHIP_END,
                     importance=EventImportance.MEDIUM,
-                    message=f"Пара {npc_a.get_full_name()} и {npc_b.get_full_name()} распалась.",
+                    message=f"💔 Пара {npc_a.get_full_name()} и {npc_b.get_full_name()} распалась.",
                     participants=[npc_a.id, npc_b.id]
                 )
 
@@ -544,7 +544,7 @@ class SocialManager:
                     self.simulation.event_aggregator.publish_event(
                         event_type=EventType.ROMANCE_START,
                         importance=EventImportance.HIGH,
-                        message=f"Между {npc_a.first_name} и {npc_b.first_name} проскочила искра.",
+                        message=f"✨ Между {npc_a.first_name} и {npc_b.first_name} проскочила романтическая искра.",
                         participants=[npc_a.id, npc_b.id]
                     )
 
@@ -571,7 +571,7 @@ class SocialManager:
                 self.simulation.event_aggregator.publish_event(
                     event_type=EventType.SOCIAL_INTERACTION,
                     importance=EventImportance.MEDIUM,
-                    message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} познакомились.",
+                    message=f"👋 {npc_a.get_full_name()} и {npc_b.get_full_name()} познакомились.",
                     participants=[npc_a.id, npc_b.id]
                 )
 

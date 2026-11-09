@@ -207,7 +207,8 @@ class PropertyManager:
             self.simulation.event_aggregator.publish_event(
                 event_type=EventType.SOCIAL_INTERACTION,
                 importance=EventImportance.LOW,
-                message=f"🎁 {sender.get_full_name()} преподнес(ла) подарок («{gift_name}») {receiver.get_full_name()}.",
+                message=f"🎁 {sender.get_full_name()} преподнес(ла) подарок («{gift_name}») для {receiver.get_full_name()}.",
+
                 participants=[sender.id, receiver.id]
             )
 

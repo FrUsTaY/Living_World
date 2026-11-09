@@ -139,12 +139,15 @@ class CrimeManager:
                 target_location = target_enterprise.building_id
 
         self.total_crimes_committed += 1
-        dist_id = "unknown"
+        dist_name = "Центральном районе"
         if city:
             b = city.get_building(target_location)
             if b and getattr(b, 'district_id', None):
                 dist_id = b.district_id
                 self.district_crime_counts[dist_id] = self.district_crime_counts.get(dist_id, 0) + 1
+                dist = city.get_district(dist_id)
+                if dist and dist.name:
+                    dist_name = f"районе «{dist.name}»"
 
         # Проверка патруля: если локация патрулируется, 90% вероятность задержания на месте преступления
         patrolled = self.is_patrolled(target_location)
@@ -187,7 +190,7 @@ class CrimeManager:
             self.process_court_verdict(offender, CrimeType.THEFT, caught_red_handed=False, current_datetime=current_datetime)
         else:
             self._publish_event(
-                f"⚠️ В районе {dist_id} совершена кража продуктов и денег. Преступнику удалось скрыться.",
+                f"⚠️ В {dist_name} совершена кража продуктов и денег. Преступнику удалось скрыться.",
                 EventType.SOCIAL_INTERACTION,
                 EventImportance.LOW,
                 [offender.id]
@@ -322,7 +325,7 @@ class CrimeManager:
             offender.mood = max(0.0, offender.mood - 15.0)
             offender.stress = min(100.0, getattr(offender, 'stress', 0.0) + 20.0)
             self._publish_event(
-                f"⚖ Городской суд приговорил {offender.get_full_name()} к штрафу {fine:.0f} ₽ за мелкое хищение.",
+                f"⚖ Городской суд вынес решение: {offender.get_full_name()} оштрафован(а) на {fine:.0f} ₽ за мелкое хищение.",
                 EventType.SOCIAL_INTERACTION,
                 EventImportance.MEDIUM,
                 [offender.id]

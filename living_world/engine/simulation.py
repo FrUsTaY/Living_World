@@ -244,7 +244,7 @@ class Simulation:
                         self.event_aggregator.publish_event(
                             event_type=EventType.JOB_CHANGE,
                             importance=EventImportance.LOW,
-                            message=f"{npc.get_full_name()} ({age} лет) вышел(ла) на заслуженную пенсию.",
+                            message=f"👵 {npc.get_full_name()} ({age} лет) вышел(ла) на заслуженную пенсию.",
                             participants=[npc.id]
                         )
 
@@ -293,7 +293,7 @@ class Simulation:
                                 self.event_aggregator.publish_event(
                                     event_type=EventType.MOVE,
                                     importance=EventImportance.MEDIUM,
-                                    message=f"{npc.get_full_name()} начал(а) самостоятельную жизнь и переехал(а) в {target_home.name}.",
+                                    message=f"📦 {npc.get_full_name()} начал(а) самостоятельную жизнь и переехал(а) в {target_home.name}.",
                                     participants=[npc.id] + ([spouse.id] if spouse else [])
                                 )
 
@@ -326,7 +326,7 @@ class Simulation:
                     self.event_aggregator.publish_event(
                         event_type=EventType.ECONOMIC,
                         importance=EventImportance.LOW,
-                        message=f"⚖ Алименты: {npc.get_full_name()} перечислил(а) {alimony_amount:,.0f} ₽ {custodial.get_full_name()} на содержание детей ({len(minor_children)} чел.).",
+                        message=f"⚖ Алименты: {npc.get_full_name()} перечислил(а) {alimony_amount:,.0f} ₽ для {custodial.get_full_name()} на содержание детей ({len(minor_children)} чел.).",
                         participants=[npc.id, custodial.id] + [c.id for c in minor_children]
                     )
 

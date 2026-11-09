@@ -59,7 +59,8 @@ class FamilyManager:
                     self.simulation.event_aggregator.publish_event(
                         event_type=EventType.ECONOMIC,
                         importance=EventImportance.MEDIUM,
-                        message=f"Наследство: {estate:,.0f} ₽ умершего {npc.get_full_name()} перешли супруге/супругу {spouse.get_full_name()}.",
+                        message=f"💰 Наследство: {estate:,.0f} ₽ от {npc.get_full_name()} перешли к супругу(е) {spouse.get_full_name()}.",
+
                         participants=[npc.id, spouse.id]
                     )
             else:
@@ -74,7 +75,8 @@ class FamilyManager:
                         self.simulation.event_aggregator.publish_event(
                             event_type=EventType.ECONOMIC,
                             importance=EventImportance.MEDIUM,
-                            message=f"Наследство: {estate:,.0f} ₽ от {npc.get_full_name()} разделены между детьми ({len(children)} чел.).",
+                            message=f"💰 Наследство: {estate:,.0f} ₽ от {npc.get_full_name()} разделены между детьми ({len(children)} чел.).",
+
                             participants=[npc.id] + [c.id for c in children]
                         )
                 elif hasattr(self.simulation, 'economy_manager') and hasattr(self.simulation.economy_manager, 'city_treasury'):
@@ -85,7 +87,8 @@ class FamilyManager:
                         self.simulation.event_aggregator.publish_event(
                             event_type=EventType.ECONOMIC,
                             importance=EventImportance.LOW,
-                            message=f"Выморочное имущество: {estate:,.0f} ₽ от {npc.get_full_name()} поступили в городскую казну.",
+                            message=f"🏛 Выморочное имущество: {estate:,.0f} ₽ от {npc.get_full_name()} поступили в городскую казну.",
+
                             participants=[npc.id]
                         )
 
@@ -185,11 +188,11 @@ class FamilyManager:
             self.simulation.event_aggregator.publish_event(
                 event_type=EventType.FAMILY_CREATED,
                 importance=EventImportance.HIGH,
-                message=f"{npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!",
+                message=f"💍 {npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!",
                 participants=[npc_a.id, npc_b.id]
             )
         else:
-            bus.publish("log_event", f"{npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!")
+            bus.publish("log_event", f"💍 {npc_a.get_full_name()} и {npc_b.get_full_name()} создали семью!")
 
         bus.publish("family_created", family)
 
