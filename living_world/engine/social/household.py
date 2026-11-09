@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+import json
 
 class Household:
     def __init__(self, home_id: str, creation_time: str, household_id: str = None, stress: float = 0.0,
@@ -25,12 +26,26 @@ class Household:
 
     @classmethod
     def from_dict(cls, data):
+        appliances = data.get('appliances', [])
+        if isinstance(appliances, str):
+            try:
+                appliances = json.loads(appliances)
+            except Exception:
+                appliances = []
+
+        pet = data.get('pet')
+        if isinstance(pet, str):
+            try:
+                pet = json.loads(pet)
+            except Exception:
+                pet = None
+
         return cls(
             home_id=data.get('home_id'),
             creation_time=data.get('creation_time'),
             household_id=data.get('id'),
-            stress=data.get('stress', 0.0),
-            appliances=data.get('appliances', []),
-            pet=data.get('pet'),
-            home_comfort=data.get('home_comfort', 40.0)
+            stress=float(data.get('stress', 0.0)),
+            appliances=appliances if isinstance(appliances, list) else [],
+            pet=pet if isinstance(pet, dict) else None,
+            home_comfort=float(data.get('home_comfort', 40.0))
         )

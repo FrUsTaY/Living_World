@@ -74,6 +74,8 @@ class Simulation:
         self.full_history.append(event)
         if len(self.events_log) > 200:
             self.events_log.pop(0)
+        if len(self.full_history) > 1000:
+            self.full_history.pop(0)
 
     def save_to_file(self, file_path: str):
         from living_world.database.repository import Database

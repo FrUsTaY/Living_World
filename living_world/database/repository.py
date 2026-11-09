@@ -629,7 +629,21 @@ class Database:
             pregnancies = [dict(r) for r in cursor.fetchall()]
 
             cursor.execute("SELECT * FROM households")
-            households = [dict(r) for r in cursor.fetchall()]
+            households_raw = [dict(r) for r in cursor.fetchall()]
+            households = []
+            for h in households_raw:
+                h_dict = dict(h)
+                if isinstance(h_dict.get('appliances'), str):
+                    try:
+                        h_dict['appliances'] = json.loads(h_dict['appliances'])
+                    except Exception:
+                        h_dict['appliances'] = []
+                if isinstance(h_dict.get('pet'), str):
+                    try:
+                        h_dict['pet'] = json.loads(h_dict['pet'])
+                    except Exception:
+                        h_dict['pet'] = None
+                households.append(h_dict)
 
             # Handle backward compatibility: older save files may not have world_events table
             world_events = []

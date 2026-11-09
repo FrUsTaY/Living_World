@@ -38,8 +38,15 @@ class PropertyManager:
             return
 
         for hh in hm.households.values():
-            if not hasattr(hh, 'appliances'):
-                hh.appliances = []
+            if not hasattr(hh, 'appliances') or not isinstance(hh.appliances, list):
+                if isinstance(getattr(hh, 'appliances', None), str):
+                    try:
+                        import json
+                        hh.appliances = json.loads(hh.appliances)
+                    except Exception:
+                        hh.appliances = []
+                else:
+                    hh.appliances = []
 
             # Если все 4 базовых прибора куплены — пропускаем
             if len(hh.appliances) >= len(self.APPLIANCE_CATALOG):

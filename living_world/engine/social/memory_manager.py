@@ -9,6 +9,21 @@ class MemoryManager:
     def get_memories_for(self, npc_id):
         return [m for m in self.memories if m['owner_npc_id'] == npc_id]
 
+    def _prune_memories(self):
+        alive_npc_ids = {n.id for n in getattr(self.simulation, 'npcs', []) if n.is_alive}
+        by_owner = {}
+        for m in self.memories:
+            owner = m.get('owner_npc_id')
+            if owner not in by_owner:
+                by_owner[owner] = []
+            by_owner[owner].append(m)
+
+        pruned = []
+        for owner, mems in by_owner.items():
+            limit = 30 if owner in alive_npc_ids else 5
+            pruned.extend(mems[-limit:])
+        self.memories = pruned
+
     def add_memory(self, owner_id, target_id, event_type, description, significance, valence):
         current_minutes = self.simulation.time.get_total_minutes()
 
@@ -36,6 +51,9 @@ class MemoryManager:
             'valence': valence
         }
         self.memories.append(memory)
+        if len(self.memories) > 2000:
+            self._prune_memories()
+
         bus.publish("memory_created", memory)
         return memory
 
@@ -71,6 +89,8 @@ class MemoryManager:
                     m['sim_minutes'] = (day - 1) * 24 * 60
                 except Exception:
                     m['sim_minutes'] = 0
+        if len(self.memories) > 2000:
+            self._prune_memories()
 
     def get_all_memories(self):
         return self.memories

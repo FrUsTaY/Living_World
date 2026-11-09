@@ -38,6 +38,8 @@ class MainWindow(QMainWindow):
 
         self.timer_interval = 1000
         self.ticks_per_update = 1
+        self._is_ticking = False
+        self._last_ui_update = 0.0
         self.timer.start(self.timer_interval)
 
         self.change_speed()
@@ -110,6 +112,10 @@ class MainWindow(QMainWindow):
         self.sim.time.paused = not self.sim.time.paused
         if self.sim.time.paused:
             self.btn_play_pause.setText("▶ Запустить")
+            current_tab = self.tabs.currentWidget()
+            if hasattr(current_tab, 'update_data'):
+                current_tab.update_data()
+            self.update_log()
         else:
             self.btn_play_pause.setText("Ⅱ Пауза")
 
@@ -122,27 +128,41 @@ class MainWindow(QMainWindow):
             self.timer_interval = 100
             self.ticks_per_update = 1
         elif speed_str == "100x":
-            self.timer_interval = 100
-            self.ticks_per_update = 10
+            self.timer_interval = 40
+            self.ticks_per_update = 4
         elif speed_str == "1000x":
-            self.timer_interval = 100
-            self.ticks_per_update = 25
+            self.timer_interval = 30
+            self.ticks_per_update = 30
 
         self.timer.setInterval(self.timer_interval)
 
     def _on_tick(self):
-        if not self.sim.time.paused:
+        if self._is_ticking or self.sim.time.paused:
+            return
+        self._is_ticking = True
+        try:
             for _ in range(self.ticks_per_update):
                 self.sim.update()
 
             self.lbl_time.setText(self.sim.time.format_time())
 
-            current_tab = self.tabs.currentWidget()
-            if hasattr(current_tab, 'update_data'):
-                current_tab.update_data()
-
-            self.update_log()
-            QApplication.processEvents()
+            import time
+            now = time.monotonic()
+            ui_interval = 0.3 if self.ticks_per_update > 1 else 0.0
+            if (now - self._last_ui_update) >= ui_interval:
+                self._last_ui_update = now
+                current_tab = self.tabs.currentWidget()
+                if hasattr(current_tab, 'update_data'):
+                    current_tab.update_data()
+                self.update_log()
+        except Exception as e:
+            self.sim.time.paused = True
+            self.btn_play_pause.setText("▶ Запустить")
+            import traceback
+            traceback.print_exc()
+            QMessageBox.critical(self, "Ошибка симуляции", f"Произошла ошибка в симуляции:\n{e}\n\nСимуляция приостановлена.")
+        finally:
+            self._is_ticking = False
 
     def _on_tab_changed(self, index):
         widget = self.tabs.widget(index)
