@@ -60,7 +60,13 @@ class Simulation:
         self.event_journal = EventJournal()
         self.event_aggregator = EventAggregator(self.event_journal, self)
 
+        self.speed_factor = 1
+        self._ai_tick_counter = 0
+
         bus.subscribe("log_event", self._on_log_event)
+
+    def update_speed(self, speed_factor: int):
+        self.speed_factor = speed_factor
 
     def close(self):
         """Release global event-bus subscriptions before discarding a world."""
@@ -174,7 +180,14 @@ class Simulation:
                 self.holiday_manager.daily_update(self.time.current_datetime)
                 self.property_manager.daily_update(self.time.current_datetime)
 
-            for npc in self.npcs:
+            self._ai_tick_counter += 1
+            ai_interval = 1
+            if getattr(self, 'speed_factor', 1) >= 1000:
+                ai_interval = 15
+            elif getattr(self, 'speed_factor', 1) >= 100:
+                ai_interval = 8
+
+            for npc_idx, npc in enumerate(self.npcs):
                 if not npc.is_alive:
                     continue
 
@@ -211,8 +224,15 @@ class Simulation:
                 current_mood = getattr(npc, 'mood', 100.0)
                 npc.mood = max(0.0, min(100.0, current_mood * 0.96 + bio_baseline * 0.04))
 
-                # 2. Выбор и выполнение действия через Utility AI
-                self.ai_controller.choose_and_execute_action(npc, time_dict)
+                # 2. Выбор и выполнение действия через Utility AI (прореживаем на высоких скоростях)
+                run_ai = True
+                if ai_interval > 1:
+                    is_critical = (npc.hunger < 20.0 or npc.energy < 15.0 or getattr(npc, 'hygiene', 100.0) < 15.0)
+                    if not is_critical and (self._ai_tick_counter + npc_idx) % ai_interval != 0:
+                        run_ai = False
+
+                if run_ai:
+                    self.ai_controller.choose_and_execute_action(npc, time_dict)
 
                 # Логируем смену состояния
                 if npc.state != getattr(npc, '_last_state', None) and getattr(npc, '_last_state', None) is not None:

@@ -121,18 +121,26 @@ class MainWindow(QMainWindow):
 
     def change_speed(self):
         speed_str = self.cb_speed.currentText()
+        speed_val = 1
         if speed_str == "1x":
             self.timer_interval = 1000
             self.ticks_per_update = 1
+            speed_val = 1
         elif speed_str == "10x":
             self.timer_interval = 100
             self.ticks_per_update = 1
+            speed_val = 10
         elif speed_str == "100x":
             self.timer_interval = 50
             self.ticks_per_update = 5
+            speed_val = 100
         elif speed_str == "1000x":
             self.timer_interval = 50
             self.ticks_per_update = 50
+            speed_val = 1000
+
+        if hasattr(self.sim, 'update_speed'):
+            self.sim.update_speed(speed_val)
 
         self.timer.setInterval(self.timer_interval)
 
@@ -143,6 +151,11 @@ class MainWindow(QMainWindow):
         try:
             for _ in range(self.ticks_per_update):
                 self.sim.update()
+
+            if self.ticks_per_update >= 5:
+                app_inst = QApplication.instance()
+                if app_inst:
+                    app_inst.processEvents()
 
             self.lbl_time.setText(self.sim.time.format_time())
 
@@ -202,6 +215,7 @@ class MainWindow(QMainWindow):
                 tab.update_data()
 
         self.update_log()
+        self.change_speed()
         self.lbl_time.setText(self.sim.time.format_time())
         QMessageBox.information(self, "Новый мир", "Мир успешно создан!")
 
@@ -412,6 +426,7 @@ class MainWindow(QMainWindow):
                     if hasattr(tab, 'update_data'):
                         tab.update_data()
 
+                self.change_speed()
                 self.lbl_time.setText(self.sim.time.format_time())
                 self.update_log()
 
